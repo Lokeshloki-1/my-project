@@ -1,12 +1,12 @@
 # Hazpo ERP
 
 A small ERP for managing companies, employees, customers, products, sales orders,
-monthly sales reports and **DDP (Delivered Duty Paid)** export shipments.
+invoices and payments, monthly sales reports and **DDP (Delivered Duty Paid)** export shipments.
 
 | Layer    | Technology |
 |----------|------------|
 | Frontend | React 19 + Vite, React Router, Axios, Recharts |
-| Backend  | Django 6 + Django REST Framework, JWT login (SimpleJWT) |
+| Backend  | Django 6 + Django REST Framework, JWT login (SimpleJWT), ReportLab (invoice PDFs) |
 | Database | PostgreSQL 16 |
 
 ## Features
@@ -17,6 +17,17 @@ monthly sales reports and **DDP (Delivered Duty Paid)** export shipments.
 - **Customers & products** – products carry price, GST % and HS code (needed for customs).
 - **Sales orders** – multiple line items; subtotal, GST and total are always calculated by the server.
   Status flow: draft → confirmed → invoiced → paid (or cancelled). Only drafts can be deleted.
+
+**Invoices & payments**
+- Create an invoice from a **confirmed** sales order (button on the order). The invoice copies the order's
+  amounts, the order becomes *invoiced* and is then **locked** against edits.
+- Due date = invoice date + payment terms (default 30 days). Overdue invoices are highlighted.
+- **Download PDF**: a tax invoice with HSN codes, GST per line, Indian number format and the amount in words.
+- **Record payments** (bank transfer, UPI, cheque, cash, card) — full or part. A payment can't be more than
+  the balance. Invoice status moves unpaid → partially paid → paid, and the order becomes *paid* automatically.
+- Mistakes: payments can't be edited; an admin/manager deletes the payment and records it again.
+  An invoice with no payments can be cancelled, which also cancels its order. Invoices are never deleted.
+- The dashboard shows money owed to you and how much of it is overdue.
 
 **DDP shipments**
 Under DDP your company pays every cost until the goods reach the customer. For each shipment Hazpo calculates:
@@ -38,8 +49,12 @@ The form shows this live while you type, and tracks status (booked → in transi
 
 Only orders that are *confirmed*, *invoiced* or *paid* count as sales.
 
-**Roles** – `admin` and `manager` can edit companies, employees and products; every logged-in user can
-view them and can create customers, orders and shipments.
+**Roles**
+| Role | Can do |
+|------|--------|
+| `admin`, `manager` | everything, including editing companies, employees, products and deleting payments |
+| `accountant` | create invoices, record payments, cancel invoices; view everything |
+| `sales` | create customers, orders and shipments; view invoices and payments |
 
 ## Project structure
 
@@ -51,6 +66,7 @@ backend/
     companies/      Company model + seed_demo command
     employees/      Department, Employee
     sales/          Customer, Product, SalesOrder, SalesOrderItem
+    billing/        Invoice, Payment, invoice PDF (pdf.py)
     ddp/            Shipment (DDP landed cost)
     reports/        Dashboard & sales report APIs
 frontend/
@@ -119,6 +135,10 @@ All endpoints need `Authorization: Bearer <access token>` except login.
 | `/api/departments/`, `/api/employees/` | CRUD (`?company=`, `?status=`, `?search=`) |
 | `/api/customers/`, `/api/products/` | CRUD |
 | `/api/sales-orders/` | CRUD with nested `items` (`?status=`, `?order_date__gte=`) |
+| `/api/invoices/` | list / create (`{sales_order, payment_terms_days}`) / view / edit due date & notes |
+| `GET  /api/invoices/{id}/pdf/` | invoice PDF download |
+| `POST /api/invoices/{id}/cancel/` | cancel an invoice with no payments |
+| `/api/payments/` | list / record (`{invoice, amount, payment_date, method, reference}`) / delete |
 | `/api/ddp/shipments/` | CRUD |
 | `POST /api/ddp/shipments/quote/` | landed-cost calculator (saves nothing) |
 | `GET /api/reports/dashboard/` | dashboard numbers |
@@ -137,5 +157,5 @@ Lists are paginated (25 per page, `?page=2`, `?page_size=100` up to 500).
 
 ## Ideas for next steps
 
-Invoices as PDF · payments & outstanding balance · stock / inventory · purchase orders ·
+Credit notes · CGST/SGST vs IGST split by state · payment reminders by email · stock / inventory · purchase orders ·
 attendance & payroll · export reports to Excel · per-company user access.

@@ -10,12 +10,12 @@ import Modal from './Modal'
  * Props:
  *   title, endpoint ('/companies/'), columns [{ key, label, render? }],
  *   fields (form config, see FormField), defaults (new record values),
- *   managerOnly (hide edit buttons for non-managers), filters (extra query params),
+ *   managerOnly (hide edit buttons for non-managers), readOnly (list only),
  *   renderFormExtra(form) — optional extra UI under the form.
  */
-export default function ResourcePage({ title, endpoint, columns, fields, defaults = {}, managerOnly, renderFormExtra, subtitle }) {
+export default function ResourcePage({ title, endpoint, columns, fields, defaults = {}, managerOnly, readOnly, renderFormExtra, subtitle }) {
   const { canManage } = useAuth()
-  const canEdit = !managerOnly || canManage
+  const canEdit = !readOnly && (!managerOnly || canManage)
   const [rows, setRows] = useState([])
   const [count, setCount] = useState(0)
   const [page, setPage] = useState(1)

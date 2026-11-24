@@ -15,6 +15,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.accounts.models import User
+from apps.billing.models import Invoice, Payment
 from apps.companies.models import Company
 from apps.ddp.models import Shipment
 from apps.employees.models import Department, Employee
@@ -77,10 +78,11 @@ class Command(BaseCommand):
                     order_date = month_start.replace(day=day)
                     if order_date > today:
                         order_date = today
+                    target_status = random.choice(["confirmed", "invoiced", "paid", "paid", "draft"])
                     order = SalesOrder.objects.create(
                         company=company, customer=random.choice(customers),
                         salesperson=random.choice(employees), order_date=order_date,
-                        status=random.choice(["confirmed", "invoiced", "paid", "paid", "draft"]),
+                        status="draft" if target_status == "draft" else "confirmed",
                     )
                     for p in random.sample(products, random.randint(1, 3)):
                         SalesOrderItem.objects.create(
@@ -88,6 +90,8 @@ class Command(BaseCommand):
                             unit_price=p.unit_price, tax_rate=p.tax_rate,
                         )
                     order.recalculate_totals()
+                    if target_status in ("invoiced", "paid"):
+                        self._invoice(order, paid=target_status == "paid", today=today)
 
             for order in SalesOrder.objects.filter(company=company, customer__country__in=["UAE", "Germany", "Sri Lanka"])[:5]:
                 Shipment.objects.create(
@@ -102,3 +106,22 @@ class Command(BaseCommand):
                 )
 
         self.stdout.write(self.style.SUCCESS("Demo data created. Login: admin / admin12345"))
+
+    def _invoice(self, order, paid, today):
+        invoice = Invoice.objects.create(
+            sales_order=order, company=order.company, customer=order.customer,
+            invoice_date=order.order_date, due_date=order.order_date + timedelta(days=30),
+            subtotal=order.subtotal, tax_amount=order.tax_amount, total=order.total,
+        )
+        order.status = SalesOrder.Status.INVOICED
+        order.save(update_fields=["status"])
+        pay_date = min(order.order_date + timedelta(days=random.randint(5, 40)), today)
+        if paid:
+            Payment.objects.create(invoice=invoice, payment_date=pay_date, amount=invoice.total,
+                                   method=random.choice(["bank_transfer", "upi", "cheque"]),
+                                   reference=f"UTR{random.randint(10**9, 10**10)}")
+        elif random.random() < 0.4:
+            Payment.objects.create(invoice=invoice, payment_date=pay_date,
+                                   amount=(invoice.total / 2).quantize(Decimal("0.01")),
+                                   method="bank_transfer", reference=f"UTR{random.randint(10**9, 10**10)}")
+        invoice.refresh_payment_status()

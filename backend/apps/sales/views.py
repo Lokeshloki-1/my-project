@@ -25,7 +25,7 @@ class ProductViewSet(viewsets.ModelViewSet):
 class SalesOrderViewSet(viewsets.ModelViewSet):
     queryset = SalesOrder.objects.select_related("company", "customer", "salesperson").prefetch_related(
         "items__product"
-    )
+    ).select_related("invoice")
     serializer_class = SalesOrderSerializer
     filterset_fields = {
         "company": ["exact"],

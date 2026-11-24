@@ -10,6 +10,8 @@ import Products from './pages/Products'
 import SalesOrders from './pages/SalesOrders'
 import Shipments from './pages/Shipments'
 import Reports from './pages/Reports'
+import Invoices from './pages/Invoices'
+import Payments from './pages/Payments'
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
@@ -28,6 +30,8 @@ export default function App() {
         <Route path="customers" element={<Customers />} />
         <Route path="products" element={<Products />} />
         <Route path="sales" element={<SalesOrders />} />
+        <Route path="invoices" element={<Invoices />} />
+        <Route path="payments" element={<Payments />} />
         <Route path="ddp" element={<Shipments />} />
         <Route path="reports" element={<Reports />} />
       </Route>

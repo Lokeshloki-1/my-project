@@ -7,13 +7,14 @@ Only orders with status confirmed / invoiced / paid count as sales.
 from datetime import date
 from decimal import Decimal
 
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import Coalesce, ExtractMonth
 from django.utils import timezone
 from rest_framework.decorators import api_view
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from apps.billing.models import Invoice
 from apps.companies.models import Company
 from apps.ddp.models import Shipment
 from apps.employees.models import Employee
@@ -36,13 +37,20 @@ def _int_param(request, name, default, lo, hi):
     return value
 
 
+def _company_param(request):
+    raw = request.query_params.get("company")
+    if not raw:
+        return None
+    if not raw.isdigit():
+        raise ValidationError({"company": "Must be a company id."})
+    return int(raw)
+
+
 def _revenue_orders(request):
     qs = SalesOrder.objects.filter(status__in=SalesOrder.REVENUE_STATUSES)
-    company = request.query_params.get("company")
+    company = _company_param(request)
     if company:
-        if not company.isdigit():
-            raise ValidationError({"company": "Must be a company id."})
-        qs = qs.filter(company_id=int(company))
+        qs = qs.filter(company_id=company)
     return qs
 
 
@@ -71,7 +79,15 @@ def dashboard(request):
     if totals["last_month"]:
         growth = round(float((totals["this_month"] - totals["last_month"]) / totals["last_month"] * 100), 1)
 
-    company = request.query_params.get("company")
+    company = _company_param(request)
+    open_invoices = Invoice.objects.filter(status__in=[Invoice.Status.UNPAID, Invoice.Status.PARTIALLY_PAID])
+    if company:
+        open_invoices = open_invoices.filter(company_id=company)
+    receivables = open_invoices.aggregate(
+        outstanding=Coalesce(Sum(F("total") - F("amount_paid")), ZERO),
+        overdue=Coalesce(Sum(F("total") - F("amount_paid"), filter=Q(due_date__lt=today)), ZERO),
+        overdue_count=Count("id", filter=Q(due_date__lt=today)),
+    )
     employees = Employee.objects.filter(status=Employee.Status.ACTIVE)
     shipments = Shipment.objects.exclude(status__in=[Shipment.Status.DELIVERED, Shipment.Status.CANCELLED])
     if company:
@@ -88,6 +104,9 @@ def dashboard(request):
         "active_employees": employees.count(),
         "companies": Company.objects.filter(is_active=True).count(),
         "open_ddp_shipments": shipments.count(),
+        "outstanding_receivables": receivables["outstanding"],
+        "overdue_receivables": receivables["overdue"],
+        "overdue_invoices": receivables["overdue_count"],
     })
 
 
@@ -128,7 +147,7 @@ def employee_sales(request):
         sales_orders__order_date__lt=end,
     )
     employees = Employee.objects.select_related("company").exclude(status=Employee.Status.EXITED)
-    company = request.query_params.get("company")
+    company = _company_param(request)
     if company:
         employees = employees.filter(company_id=company)
     employees = employees.annotate(

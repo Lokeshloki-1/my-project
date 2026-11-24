@@ -28,9 +28,10 @@ export function AuthProvider({ children }) {
   }
 
   const canManage = !!user && (user.is_superuser || ['admin', 'manager'].includes(user.role))
+  const canFinance = canManage || user?.role === 'accountant'
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, canManage }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, canManage, canFinance }}>
       {children}
     </AuthContext.Provider>
   )

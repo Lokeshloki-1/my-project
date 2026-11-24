@@ -28,6 +28,9 @@ export default function Dashboard() {
         <Kpi label="Sales year to date" value={money(stats.sales_year_to_date)} />
         <Kpi label="Orders this month" value={stats.orders_this_month} />
         <Kpi label="Active employees" value={stats.active_employees} sub={`${stats.companies} companies`} />
+        <Kpi label="Money owed to us" value={money(stats.outstanding_receivables)}
+          sub={stats.overdue_invoices ? `${money(stats.overdue_receivables)} overdue · ${stats.overdue_invoices} invoices` : 'Nothing overdue'}
+          tone={stats.overdue_invoices ? 'neg' : 'pos'} />
         <Kpi label="Open DDP shipments" value={stats.open_ddp_shipments} />
       </div>
 

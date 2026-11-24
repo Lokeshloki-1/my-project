@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import api, { errorMessage } from '../api/client'
+import { useAuth } from '../auth/AuthContext'
 import Modal from '../components/Modal'
 import StatusBadge from '../components/StatusBadge'
 import useOptions from '../components/useOptions'
 import { money } from '../utils/format'
 
 const STATUSES = ['draft', 'confirmed', 'invoiced', 'paid', 'cancelled']
+// Invoiced and paid are set by the billing module, not by hand.
+const EDITABLE_STATUSES = ['draft', 'confirmed', 'cancelled']
 const today = () => new Date().toISOString().slice(0, 10)
 const emptyOrder = () => ({ company: '', customer: '', salesperson: '', order_date: today(), status: 'draft', notes: '', items: [{ product: '', quantity: 1 }] })
 
@@ -58,6 +62,9 @@ export default function SalesOrders() {
 }
 
 function OrderForm({ form, setForm, onSaved, error, setError }) {
+  const { canFinance } = useAuth()
+  const navigate = useNavigate()
+  const locked = !!form.invoice_id
   const companies = useOptions('/companies/')
   const scope = form.company ? { company: form.company } : null
   const customers = useOptions('/customers/', scope)
@@ -76,18 +83,29 @@ function OrderForm({ form, setForm, onSaved, error, setError }) {
     return sum + sub + (sub * Number(it.tax_rate ?? p.tax_rate)) / 100
   }, 0)
 
-  const save = async (e) => {
-    e.preventDefault()
-    setError('')
-    const body = {
+  const buildBody = () => ({
       ...form,
       salesperson: form.salesperson || null,
       items: form.items.map(({ product, quantity, unit_price, tax_rate }) => ({ product, quantity, ...(unit_price != null && { unit_price }), ...(tax_rate != null && { tax_rate }) })),
-    }
+  })
+
+  const save = async (e) => {
+    e.preventDefault()
+    setError('')
     try {
-      if (form.id) await api.put(`/sales-orders/${form.id}/`, body)
-      else await api.post('/sales-orders/', body)
+      if (form.id) await api.put(`/sales-orders/${form.id}/`, buildBody())
+      else await api.post('/sales-orders/', buildBody())
       onSaved()
+    } catch (err) { setError(errorMessage(err)) }
+  }
+
+  // Saves any edits first, then creates the invoice and opens it.
+  const createInvoice = async () => {
+    setError('')
+    try {
+      await api.put(`/sales-orders/${form.id}/`, buildBody())
+      const { data } = await api.post('/invoices/', { sales_order: form.id })
+      navigate(`/invoices?open=${data.id}`)
     } catch (err) { setError(errorMessage(err)) }
   }
 
@@ -99,6 +117,13 @@ function OrderForm({ form, setForm, onSaved, error, setError }) {
   return (
     <Modal title={form.id ? `Order ${form.order_no}` : 'New sales order'} onClose={() => setForm(null)} wide>
       <form onSubmit={save}>
+        {locked && (
+          <div className="notice">
+            <span>This order is locked because invoice <strong>{form.invoice_no}</strong> was issued for it.</span>
+            <Link to={`/invoices?open=${form.invoice_id}`}>Open invoice</Link>
+          </div>
+        )}
+        <fieldset disabled={locked} className="plain">
         <div className="form-grid">
           <label className="field"><span>Company *</span>
             <select value={form.company} required onChange={(e) => setForm((f) => ({ ...f, company: e.target.value, customer: '', salesperson: '', items: [{ product: '', quantity: 1 }] }))}>
@@ -123,7 +148,7 @@ function OrderForm({ form, setForm, onSaved, error, setError }) {
           </label>
           <label className="field"><span>Status</span>
             <select value={form.status} onChange={(e) => set('status', e.target.value)}>
-              {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+              {(locked ? [form.status] : EDITABLE_STATUSES).map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </label>
           <label className="field full"><span>Notes</span>
@@ -158,13 +183,17 @@ function OrderForm({ form, setForm, onSaved, error, setError }) {
           <button type="button" className="secondary" onClick={() => set('items', [...form.items, { product: '', quantity: 1 }])}>+ Add item</button>
           <div className="total">Estimated total: <strong>{money(preview)}</strong></div>
         </div>
+        </fieldset>
 
         {error && <div className="error">{error}</div>}
         <div className="modal-foot">
           {form.id && form.status === 'draft' ? <button type="button" className="danger" onClick={remove}>Delete</button> : <span />}
           <div>
-            <button type="button" className="secondary" onClick={() => setForm(null)}>Cancel</button>
-            <button type="submit">Save order</button>
+            <button type="button" className="secondary" onClick={() => setForm(null)}>{locked ? 'Close' : 'Cancel'}</button>
+            {form.id && !locked && form.status === 'confirmed' && canFinance && (
+              <button type="button" className="secondary" onClick={createInvoice}>Save &amp; create invoice</button>
+            )}
+            {!locked && <button type="submit">Save order</button>}
           </div>
         </div>
       </form>

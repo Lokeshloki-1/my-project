@@ -37,17 +37,29 @@ class SalesOrderSerializer(serializers.ModelSerializer):
     customer_name = serializers.CharField(source="customer.name", read_only=True)
     salesperson_name = serializers.CharField(source="salesperson.full_name", read_only=True, default=None)
     company_name = serializers.CharField(source="company.name", read_only=True)
+    invoice_id = serializers.IntegerField(source="invoice.id", read_only=True, default=None)
+    invoice_no = serializers.CharField(source="invoice.invoice_no", read_only=True, default=None)
 
     class Meta:
         model = SalesOrder
         fields = [
             "id", "order_no", "company", "company_name", "customer", "customer_name",
             "salesperson", "salesperson_name", "order_date", "status", "notes",
-            "items", "subtotal", "tax_amount", "total", "created_at", "updated_at",
+            "items", "subtotal", "tax_amount", "total", "invoice_id", "invoice_no", "created_at", "updated_at",
         ]
         read_only_fields = ["order_no", "subtotal", "tax_amount", "total", "created_at", "updated_at"]
 
     def validate(self, attrs):
+        if self.instance and hasattr(self.instance, "invoice"):
+            raise serializers.ValidationError(
+                f"Order is locked because invoice {self.instance.invoice.invoice_no} was issued for it."
+            )
+        status = attrs.get("status")
+        current = getattr(self.instance, "status", None)
+        if status in (SalesOrder.Status.INVOICED, SalesOrder.Status.PAID) and status != current:
+            raise serializers.ValidationError(
+                {"status": "Invoiced and paid are set automatically by creating an invoice and recording payments."}
+            )
         company = attrs.get("company", getattr(self.instance, "company", None))
         customer = attrs.get("customer", getattr(self.instance, "customer", None))
         salesperson = attrs.get("salesperson", getattr(self.instance, "salesperson", None))
