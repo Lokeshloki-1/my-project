@@ -1,0 +1,15 @@
+# Starts PostgreSQL for local development:  docker compose up -d
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: hazpo
+      POSTGRES_USER: hazpo
+      POSTGRES_PASSWORD: hazpo_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
