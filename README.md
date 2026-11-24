@@ -1,7 +1,7 @@
 # Hazpo ERP
 
 A small ERP for managing companies, employees, customers, products, sales orders,
-invoices and payments, monthly sales reports and **DDP (Delivered Duty Paid)** export shipments.
+stock and warehouses, invoices and payments, monthly sales reports and **DDP (Delivered Duty Paid)** export shipments.
 
 | Layer    | Technology |
 |----------|------------|
@@ -17,6 +17,22 @@ invoices and payments, monthly sales reports and **DDP (Delivered Duty Paid)** e
 - **Customers & products** – products carry price, GST % and HS code (needed for customs).
 - **Sales orders** – multiple line items; subtotal, GST and total are always calculated by the server.
   Status flow: draft → confirmed → invoiced → paid (or cancelled). Only drafts can be deleted.
+
+**Stock & inventory**
+- **Warehouses** per company (e.g. a main warehouse and a depot).
+- **Stock page**: stock on hand per product per warehouse, the total across warehouses, cost, stock value,
+  and a **Low** flag when a product's total stock is at or below its **reorder level** (set on the product).
+- **Receive** (goods in from a supplier, with GRN / bill number), **Issue** (goods out that are not a sale),
+  **Adjust** (after a stock count, with a reason; use a minus number to reduce) and **Transfer** between warehouses.
+- **Sales orders take stock automatically**: choose a "ship from" warehouse on the order. When the order is
+  confirmed the stock is taken; if there isn't enough, the order is refused with a clear message. Cancelling the
+  order (or its invoice), or moving it back to draft, puts the stock back. Changing the items or warehouse of a
+  confirmed order re-balances the stock. Orders with no warehouse don't touch stock (useful for services).
+- **Stock movements**: a permanent record of every change (who, when, why, balance after). It is never edited
+  or deleted — mistakes are corrected with an adjustment.
+- Stock can never go below zero: the app checks it, and PostgreSQL enforces it too. Rows are locked while
+  stock changes, so two people selling the last item at the same moment can't both succeed.
+- The dashboard shows total stock value and how many products are low.
 
 **Invoices & payments**
 - Create an invoice from a **confirmed** sales order (button on the order). The invoice copies the order's
@@ -52,9 +68,9 @@ Only orders that are *confirmed*, *invoiced* or *paid* count as sales.
 **Roles**
 | Role | Can do |
 |------|--------|
-| `admin`, `manager` | everything, including editing companies, employees, products and deleting payments |
+| `admin`, `manager` | everything, including editing companies, employees, products, warehouses, moving stock and deleting payments |
 | `accountant` | create invoices, record payments, cancel invoices; view everything |
-| `sales` | create customers, orders and shipments; view invoices and payments |
+| `sales` | create customers, orders and shipments; view invoices, payments and stock |
 
 ## Project structure
 
@@ -67,6 +83,7 @@ backend/
     employees/      Department, Employee
     sales/          Customer, Product, SalesOrder, SalesOrderItem
     billing/        Invoice, Payment, invoice PDF (pdf.py)
+    inventory/      Warehouse, StockLevel, StockMovement; services.py is the only code that changes stock
     ddp/            Shipment (DDP landed cost)
     reports/        Dashboard & sales report APIs
 frontend/
@@ -139,6 +156,10 @@ All endpoints need `Authorization: Bearer <access token>` except login.
 | `GET  /api/invoices/{id}/pdf/` | invoice PDF download |
 | `POST /api/invoices/{id}/cancel/` | cancel an invoice with no payments |
 | `/api/payments/` | list / record (`{invoice, amount, payment_date, method, reference}`) / delete |
+| `/api/warehouses/` | CRUD |
+| `GET  /api/stock-levels/` | stock per product per warehouse (`?warehouse=`, `?low_stock=true`, `?hide_empty=true`) |
+| `/api/stock-movements/` | ledger list; `POST` `{movement_type: receipt\|issue\|adjustment, product, warehouse, quantity, reference, note}` |
+| `POST /api/stock-movements/transfer/` | `{product, from_warehouse, to_warehouse, quantity}` |
 | `/api/ddp/shipments/` | CRUD |
 | `POST /api/ddp/shipments/quote/` | landed-cost calculator (saves nothing) |
 | `GET /api/reports/dashboard/` | dashboard numbers |
@@ -157,5 +178,6 @@ Lists are paginated (25 per page, `?page=2`, `?page_size=100` up to 500).
 
 ## Ideas for next steps
 
-Credit notes · CGST/SGST vs IGST split by state · payment reminders by email · stock / inventory · purchase orders ·
+Credit notes · CGST/SGST vs IGST split by state · purchase orders and suppliers (feeding stock receipts) ·
+batch / expiry tracking · payment reminders by email · purchase orders ·
 attendance & payroll · export reports to Excel · per-company user access.

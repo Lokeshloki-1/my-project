@@ -19,6 +19,8 @@ from apps.billing.models import Invoice, Payment
 from apps.companies.models import Company
 from apps.ddp.models import Shipment
 from apps.employees.models import Department, Employee
+from apps.inventory.models import StockMovement, Warehouse
+from apps.inventory.services import issue_for_order, move_stock
 from apps.sales.models import Customer, Product, SalesOrder, SalesOrderItem
 
 
@@ -64,12 +66,21 @@ class Command(BaseCommand):
                 ]
             ]
             products = [
-                Product.objects.create(company=company, sku=f"P{i:03d}", name=name, unit_price=Decimal(price), hs_code=hs)
-                for i, (name, price, hs) in enumerate([
-                    ("Steel Valve 2in", 1850, "848180"), ("Copper Pipe 10m", 4200, "741110"),
-                    ("Pump Motor 1HP", 12500, "841370"), ("Pressure Gauge", 950, "902620"),
+                Product.objects.create(
+                    company=company, sku=f"P{i:03d}", name=name, unit_price=Decimal(price), hs_code=hs,
+                    cost_price=(Decimal(price) * Decimal("0.65")).quantize(Decimal("0.01")), reorder_level=Decimal(reorder),
+                )
+                for i, (name, price, hs, reorder) in enumerate([
+                    ("Steel Valve 2in", 1850, "848180", 50), ("Copper Pipe 10m", 4200, "741110", 40),
+                    ("Pump Motor 1HP", 12500, "841370", 150), ("Pressure Gauge", 950, "902620", 60),
                 ])
             ]
+            city = "Chennai" if company.code == "HZP-IN" else "Mumbai"
+            main_wh = Warehouse.objects.create(company=company, code="MAIN", name=f"{city} Main Warehouse", city=city)
+            Warehouse.objects.create(company=company, code="DEPOT", name="Bengaluru Depot", city="Bengaluru")
+            for p, qty in zip(products, [900, 700, 330, 1000]):
+                move_stock(product=p, warehouse=main_wh, quantity=qty, movement_type=StockMovement.Type.RECEIPT,
+                           unit_cost=p.cost_price, reference="OPENING", note="Opening stock")
             # 14 months of orders so reports have history
             for back in range(14):
                 month_start = (today.replace(day=1) - timedelta(days=back * 30)).replace(day=1)
@@ -81,7 +92,7 @@ class Command(BaseCommand):
                     target_status = random.choice(["confirmed", "invoiced", "paid", "paid", "draft"])
                     order = SalesOrder.objects.create(
                         company=company, customer=random.choice(customers),
-                        salesperson=random.choice(employees), order_date=order_date,
+                        salesperson=random.choice(employees), order_date=order_date, warehouse=main_wh,
                         status="draft" if target_status == "draft" else "confirmed",
                     )
                     for p in random.sample(products, random.randint(1, 3)):
@@ -90,6 +101,8 @@ class Command(BaseCommand):
                             unit_price=p.unit_price, tax_rate=p.tax_rate,
                         )
                     order.recalculate_totals()
+                    if order.status == "confirmed":
+                        self._issue_with_restock(order)
                     if target_status in ("invoiced", "paid"):
                         self._invoice(order, paid=target_status == "paid", today=today)
 
@@ -106,6 +119,17 @@ class Command(BaseCommand):
                 )
 
         self.stdout.write(self.style.SUCCESS("Demo data created. Login: admin / admin12345"))
+
+    def _issue_with_restock(self, order):
+        """Take stock for the order; if a product is short, record a restock receipt first (like a purchase)."""
+        for item in order.items.select_related("product"):
+            level = item.product.stock_levels.filter(warehouse=order.warehouse).first()
+            available = level.quantity if level else Decimal("0")
+            if available < item.quantity:
+                move_stock(product=item.product, warehouse=order.warehouse, quantity=Decimal("200"),
+                           movement_type=StockMovement.Type.RECEIPT, unit_cost=item.product.cost_price,
+                           reference=f"GRN-{order.order_date:%y%m}", note="Restock from supplier")
+        issue_for_order(order)
 
     def _invoice(self, order, paid, today):
         invoice = Invoice.objects.create(

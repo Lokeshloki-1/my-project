@@ -12,6 +12,9 @@ import Shipments from './pages/Shipments'
 import Reports from './pages/Reports'
 import Invoices from './pages/Invoices'
 import Payments from './pages/Payments'
+import Stock from './pages/Stock'
+import StockMovements from './pages/StockMovements'
+import Warehouses from './pages/Warehouses'
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
@@ -32,6 +35,9 @@ export default function App() {
         <Route path="sales" element={<SalesOrders />} />
         <Route path="invoices" element={<Invoices />} />
         <Route path="payments" element={<Payments />} />
+        <Route path="stock" element={<Stock />} />
+        <Route path="stock-movements" element={<StockMovements />} />
+        <Route path="warehouses" element={<Warehouses />} />
         <Route path="ddp" element={<Shipments />} />
         <Route path="reports" element={<Reports />} />
       </Route>

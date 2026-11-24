@@ -6,6 +6,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from apps.accounts.permissions import IsFinanceOrReadOnly
+from apps.inventory.services import return_for_order
 from apps.sales.models import SalesOrder
 
 from .models import Invoice, Payment
@@ -46,7 +47,7 @@ class InvoiceViewSet(
 
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
-        """Cancel an invoice that has no payments. Its sales order is cancelled too."""
+        """Cancel an invoice that has no payments. Its sales order is cancelled and its stock returned."""
         with transaction.atomic():
             invoice = Invoice.objects.select_for_update().get(pk=self.get_object().pk)
             if invoice.status == Invoice.Status.CANCELLED:
@@ -55,9 +56,10 @@ class InvoiceViewSet(
                 raise ValidationError("Invoices with payments cannot be cancelled. Delete the payments first.")
             invoice.status = Invoice.Status.CANCELLED
             invoice.save(update_fields=["status", "updated_at"])
-            order = invoice.sales_order
+            order = SalesOrder.objects.select_for_update().get(pk=invoice.sales_order_id)
             order.status = SalesOrder.Status.CANCELLED
             order.save(update_fields=["status", "updated_at"])
+            return_for_order(order, user=request.user)  # goods come back into stock
         return Response(InvoiceSerializer(invoice).data)
 
 
