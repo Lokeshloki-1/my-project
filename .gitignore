@@ -14,3 +14,7 @@ frontend/.env*.local
 .DS_Store
 .vscode/
 .idea/
+
+# Production secrets
+.env.prod
+backups/

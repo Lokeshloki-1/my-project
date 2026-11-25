@@ -204,12 +204,10 @@ All endpoints need `Authorization: Bearer <access token>` except login.
 
 Lists are paginated (25 per page, `?page=2`, `?page_size=100` up to 500).
 
-## Before going to production
+## Running it for real (production)
 
-- Set `DJANGO_DEBUG=false`, a long random `DJANGO_SECRET_KEY`, and real `DJANGO_ALLOWED_HOSTS`.
-- Change or delete the demo `admin` user.
-- Build the frontend with `npm run build` and serve `frontend/dist/`; run Django with gunicorn.
-- Set `VITE_API_URL` if the API is on a different domain, and add that domain to `CORS_ALLOWED_ORIGINS`.
+See **[DEPLOY.md](DEPLOY.md)** — a step-by-step guide to put Hazpo on a server with HTTPS using Docker
+(`docker-compose.prod.yml`), plus daily backups (`scripts/backup.sh`, `scripts/restore.sh`) and a go-live checklist.
 
 ## Ideas for next steps
 

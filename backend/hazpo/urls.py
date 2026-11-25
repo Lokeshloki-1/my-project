@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.db import connection
+from django.http import JsonResponse
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
@@ -23,7 +25,18 @@ router.register("warehouses", WarehouseViewSet)
 router.register("stock-levels", StockLevelViewSet)
 router.register("stock-movements", StockMovementViewSet)
 
+def health(request):
+    """For uptime monitors and Docker: 200 when the app and database are working."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+    except Exception:  # noqa: BLE001 - any DB failure means unhealthy
+        return JsonResponse({"status": "error", "database": "unreachable"}, status=503)
+    return JsonResponse({"status": "ok"})
+
+
 urlpatterns = [
+    path("api/health/", health, name="health"),
     path("admin/", admin.site.urls),
     path("api/auth/", include("apps.accounts.urls")),
     path("api/reports/", include("apps.reports.urls")),

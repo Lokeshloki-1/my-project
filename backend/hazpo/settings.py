@@ -58,6 +58,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # serves admin CSS/JS in production
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -115,6 +116,13 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        if not DEBUG else "django.contrib.staticfiles.storage.StaticFilesStorage"
+    },
+}
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # REST API
@@ -149,3 +157,34 @@ RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "")
 RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
 RAZORPAY_QR_MINUTES = int(os.getenv("RAZORPAY_QR_MINUTES", "15"))  # QR stays valid this long (2-120)
 RAZORPAY_API_BASE = os.getenv("RAZORPAY_API_BASE", "https://api.razorpay.com/v1")  # only change for local testing
+
+
+# ---------------------------------------------------------------------------
+# Production. Hazpo runs behind a reverse proxy (Caddy) that terminates HTTPS.
+# ---------------------------------------------------------------------------
+# Full origins the site is reached on, e.g. https://erp.example.com — needed for admin login over HTTPS.
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "")
+
+if not DEBUG:
+    # The proxy tells Django the original request was HTTPS.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = env_bool("DJANGO_SECURE_COOKIES", True)
+    CSRF_COOKIE_SECURE = env_bool("DJANGO_SECURE_COOKIES", True)
+    # Caddy already redirects http -> https; turn this on only if your proxy does not.
+    SECURE_SSL_REDIRECT = env_bool("DJANGO_SSL_REDIRECT", False)
+    # Set to 31536000 (1 year) once HTTPS works on your domain. Browsers remember it, so don't rush.
+    SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_HSTS_SECONDS", "0"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("DJANGO_HSTS_INCLUDE_SUBDOMAINS", False)
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = "DENY"
+    # Proxy handles redirect; HSTS is opt-in via DJANGO_HSTS_SECONDS (see above).
+    SILENCED_SYSTEM_CHECKS = ["security.W008"] + ([] if SECURE_HSTS_SECONDS else ["security.W004"])
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"plain": {"format": "%(asctime)s %(levelname)s %(name)s: %(message)s"}},
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "plain"}},
+    "root": {"handlers": ["console"], "level": os.getenv("DJANGO_LOG_LEVEL", "INFO")},
+    "loggers": {"django.request": {"handlers": ["console"], "level": "WARNING", "propagate": False}},
+}
