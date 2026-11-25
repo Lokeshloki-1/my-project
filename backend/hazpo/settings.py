@@ -140,3 +140,12 @@ SIMPLE_JWT = {
 
 # React dev server
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
+
+# Razorpay (UPI QR payments). Leave empty to switch the feature off.
+# Keys: Razorpay Dashboard -> Account & Settings -> API Keys.
+# Webhook secret: the secret you type when adding the webhook in Dashboard -> Webhooks.
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "")
+RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
+RAZORPAY_QR_MINUTES = int(os.getenv("RAZORPAY_QR_MINUTES", "15"))  # QR stays valid this long (2-120)
+RAZORPAY_API_BASE = os.getenv("RAZORPAY_API_BASE", "https://api.razorpay.com/v1")  # only change for local testing

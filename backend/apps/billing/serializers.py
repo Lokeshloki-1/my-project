@@ -8,7 +8,8 @@ from rest_framework import serializers
 from apps.sales.models import SalesOrder
 from apps.sales.serializers import SalesOrderItemSerializer
 
-from .models import Invoice, Payment
+from . import razorpay
+from .models import Invoice, Payment, UpiQrCode
 
 
 class PaymentSerializer(serializers.ModelSerializer):
@@ -104,9 +105,25 @@ class InvoiceSerializer(serializers.ModelSerializer):
         return instance
 
 
+class UpiQrCodeSerializer(serializers.ModelSerializer):
+    invoice_status = serializers.CharField(source="invoice.status", read_only=True)
+    invoice_balance = serializers.DecimalField(source="invoice.balance", max_digits=14, decimal_places=2, read_only=True)
+
+    class Meta:
+        model = UpiQrCode
+        fields = [
+            "id", "razorpay_qr_id", "image_url", "amount", "status", "close_by", "review_note",
+            "created_at", "invoice_status", "invoice_balance",
+        ]
+
+
 class InvoiceDetailSerializer(InvoiceSerializer):
     items = SalesOrderItemSerializer(source="sales_order.items", many=True, read_only=True)
     payments = PaymentSerializer(many=True, read_only=True)
+    upi_qr_enabled = serializers.SerializerMethodField()
 
     class Meta(InvoiceSerializer.Meta):
-        fields = InvoiceSerializer.Meta.fields + ["items", "payments"]
+        fields = InvoiceSerializer.Meta.fields + ["items", "payments", "upi_qr_enabled"]
+
+    def get_upi_qr_enabled(self, obj):
+        return razorpay.is_configured()

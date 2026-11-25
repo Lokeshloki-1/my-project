@@ -44,6 +44,10 @@ stock and warehouses, invoices and payments, monthly sales reports and **DDP (De
 - Mistakes: payments can't be edited; an admin/manager deletes the payment and records it again.
   An invoice with no payments can be cancelled, which also cancels its order. Invoices are never deleted.
 - The dashboard shows money owed to you and how much of it is overdue.
+- **Collect by UPI QR (Razorpay)**: on an unpaid invoice, click *Collect by UPI QR*. A one-time QR for the balance
+  appears; the customer scans it with PhonePe, Google Pay, Paytm, BHIM or any UPI app. When Razorpay confirms the
+  payment it is recorded automatically (with the UPI reference / UTR) and the invoice turns *Paid*. See
+  [Razorpay UPI QR setup](#razorpay-upi-qr-setup).
 
 **DDP shipments**
 Under DDP your company pays every cost until the goods reach the customer. For each shipment Hazpo calculates:
@@ -82,7 +86,7 @@ backend/
     companies/      Company model + seed_demo command
     employees/      Department, Employee
     sales/          Customer, Product, SalesOrder, SalesOrderItem
-    billing/        Invoice, Payment, invoice PDF (pdf.py)
+    billing/        Invoice, Payment, invoice PDF (pdf.py), Razorpay UPI QR (razorpay.py, upi.py)
     inventory/      Warehouse, StockLevel, StockMovement; services.py is the only code that changes stock
     ddp/            Shipment (DDP landed cost)
     reports/        Dashboard & sales report APIs
@@ -134,6 +138,35 @@ npm run dev
 ```
 Vite forwards every `/api/...` request to Django on port 8000, so no extra setup is needed.
 
+### Razorpay UPI QR setup
+
+Optional — without keys the *Collect by UPI QR* button is simply hidden.
+
+1. In the [Razorpay Dashboard](https://dashboard.razorpay.com) go to **Account & Settings → API Keys** and generate keys.
+   Use **Test Mode** keys (`rzp_test_...`) while developing.
+2. Put them in `backend/.env`:
+   ```
+   RAZORPAY_KEY_ID=rzp_test_xxxxxxxx
+   RAZORPAY_KEY_SECRET=xxxxxxxx
+   RAZORPAY_QR_MINUTES=15        # how long a QR stays payable (Razorpay allows 2–120)
+   ```
+3. Restart Django. The button appears on unpaid invoices.
+
+**How the payment reaches Hazpo** — two ways, both safe to use together (a payment is never recorded twice):
+- *While the QR is on screen* the app asks Razorpay every few seconds whether it was paid. This works on your own
+  computer with no extra setup.
+- *Webhook* (instant, and catches payments after the screen was closed). Needs a public HTTPS address, so set it up
+  on your server: Dashboard → **Account & Settings → Webhooks → Add New Webhook**, URL
+  `https://your-domain/api/razorpay/webhook/`, event **`qr_code.credited`**, and a secret of your choice. Put the same
+  secret in `RAZORPAY_WEBHOOK_SECRET`. Requests without a valid signature are rejected.
+
+**Things to know**
+- Razorpay QR codes created in **Test Mode cannot be scanned** (Razorpay's rule). To try a real payment, use Live Mode
+  keys on a small invoice (e.g. ₹1) and refund it from the Razorpay Dashboard.
+- Each QR is single-use, for the exact balance. Making a new QR closes the previous one, so a customer can't pay twice.
+- If money arrives that can't be applied (e.g. the invoice was paid in cash meanwhile), nothing is recorded and the QR
+  is marked *needs review* — apply or refund it from the Razorpay Dashboard.
+
 ### Run the tests
 ```bash
 cd backend && python manage.py test apps
@@ -155,6 +188,8 @@ All endpoints need `Authorization: Bearer <access token>` except login.
 | `/api/invoices/` | list / create (`{sales_order, payment_terms_days}`) / view / edit due date & notes |
 | `GET  /api/invoices/{id}/pdf/` | invoice PDF download |
 | `POST /api/invoices/{id}/cancel/` | cancel an invoice with no payments |
+| `POST /api/invoices/{id}/upi-qr/` | create a Razorpay UPI QR for the balance; `GET` = latest QR + payment check |
+| `POST /api/razorpay/webhook/` | Razorpay webhook (`qr_code.credited`), verified by `X-Razorpay-Signature` |
 | `/api/payments/` | list / record (`{invoice, amount, payment_date, method, reference}`) / delete |
 | `/api/warehouses/` | CRUD |
 | `GET  /api/stock-levels/` | stock per product per warehouse (`?warehouse=`, `?low_stock=true`, `?hide_empty=true`) |

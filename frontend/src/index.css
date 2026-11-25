@@ -162,3 +162,14 @@ fieldset.plain { border: 0; padding: 0; margin: 0; min-width: 0; }
 .check-inline input { width: auto; }
 tfoot td { border-top: 1px solid var(--line); border-bottom: 0; background: var(--hover); }
 table.items td small { display: block; margin-top: 2px; font-size: 11px; }
+
+/* UPI QR */
+.upi-panel { margin-top: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 8px; }
+.upi-body { display: flex; gap: 20px; align-items: center; }
+.upi-img { width: 220px; height: 220px; object-fit: contain; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
+.upi-link { display: grid; place-items: center; width: 220px; height: 220px; border: 1px dashed var(--line); border-radius: 8px; }
+.upi-amount { font-size: 28px; font-weight: 700; margin-bottom: 6px; }
+.upi-ok { background: #dcfce7; color: #166534; padding: 12px; border-radius: 6px; font-weight: 600; }
+.pulse { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-right: 6px; animation: pulse 1.2s infinite; }
+@keyframes pulse { 50% { opacity: .25; } }
+@media (max-width: 700px) { .upi-body { flex-direction: column; align-items: flex-start; } }

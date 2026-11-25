@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from apps.billing.views import InvoiceViewSet, PaymentViewSet
+from apps.billing.views import InvoiceViewSet, PaymentViewSet, RazorpayWebhookView
 from apps.companies.views import CompanyViewSet
 from apps.ddp.views import ShipmentViewSet
 from apps.employees.views import DepartmentViewSet, EmployeeViewSet
@@ -27,5 +27,6 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/auth/", include("apps.accounts.urls")),
     path("api/reports/", include("apps.reports.urls")),
+    path("api/razorpay/webhook/", RazorpayWebhookView.as_view(), name="razorpay-webhook"),
     path("api/", include(router.urls)),
 ]
