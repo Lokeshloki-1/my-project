@@ -29,6 +29,13 @@ import TechPacks from './pages/TechPacks'
 import TechPackDetail from './pages/TechPackDetail'
 import Samples from './pages/Samples'
 import SampleDetail from './pages/SampleDetail'
+import Suppliers from './pages/Suppliers'
+import MaterialRequirements from './pages/MaterialRequirements'
+import MaterialRequirementDetail from './pages/MaterialRequirementDetail'
+import RFQs from './pages/RFQs'
+import RFQDetail from './pages/RFQDetail'
+import PurchaseOrders from './pages/PurchaseOrders'
+import PurchaseOrderDetail from './pages/PurchaseOrderDetail'
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
@@ -57,6 +64,15 @@ export default function App() {
         <Route path="tech-packs/:id" element={<TechPackDetail />} />
         <Route path="samples" element={<Samples />} />
         <Route path="samples/:id" element={<SampleDetail />} />
+        <Route path="suppliers" element={<Suppliers />} />
+        <Route path="requirements" element={<MaterialRequirements />} />
+        <Route path="requirements/:id" element={<MaterialRequirementDetail />} />
+        <Route path="rfqs" element={<RFQs />} />
+        <Route path="rfqs/new" element={<RFQDetail key="new" />} />
+        <Route path="rfqs/:id" element={<RFQDetail />} />
+        <Route path="purchase-orders" element={<PurchaseOrders />} />
+        <Route path="purchase-orders/new" element={<PurchaseOrderDetail key="new" />} />
+        <Route path="purchase-orders/:id" element={<PurchaseOrderDetail />} />
         <Route path="companies" element={<Companies />} />
         <Route path="employees" element={<Employees />} />
         <Route path="customers" element={<Customers />} />

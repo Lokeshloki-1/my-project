@@ -11,7 +11,7 @@ import Modal from './Modal'
  *   title, endpoint ('/companies/'), columns [{ key, label, render? }],
  *   fields (form config, see FormField), defaults (new record values),
  *   managerOnly (hide edit buttons for non-managers), readOnly (list only),
- *   renderFormExtra(form, { close, reload }) — optional extra UI under the form.
+ *   renderFormExtra(form, { close, reload, set }) — optional extra UI under the form.
  *   params — extra query params for the list (e.g. a status filter), headerExtra — node next to search,
  *   onRowClick(row) — replaces the edit modal (e.g. open a detail page),
  *   onCreated(record) — called after a new record is saved.
@@ -130,7 +130,7 @@ export default function ResourcePage({
                   onChange={(name, v) => setForm((prev) => ({ ...prev, [name]: v }))} />
               ))}
             </div>
-            {renderFormExtra?.(form, { close: () => setForm(null), reload: load })}
+            {renderFormExtra?.(form, { close: () => setForm(null), reload: load, set: (name, v) => setForm((prev) => ({ ...prev, [name]: v })) })}
             {error && <div className="error">{error}</div>}
             <div className="modal-foot">
               {form.id ? <button type="button" className="danger" onClick={remove}>Delete</button> : <span />}

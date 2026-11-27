@@ -42,6 +42,15 @@ stock and warehouses, invoices and payments, monthly sales reports and **DDP (De
 - **Measurement check**: enter the measured values of a sample; each point is checked against spec ± tolerance.
 - An approved **PP sample** marks the style **approved for production**.
 
+**Purchase & procurement: material requirement → RFQ → supplier PO** (textile flow, step 4 — [API reference](docs/api/purchase-procurement.md))
+- **Material requirement** from a confirmed order: order pieces × tech pack BOM consumption + wastage %, with the
+  same material across styles added together. Warns about styles without a tech pack or consumption.
+  Shows ordered and open quantity per material.
+- **RFQs** to several suppliers (suggested by what they supply), price entry per supplier, a side-by-side
+  comparison with the lowest price per line and lowest total, and **award** → draft PO.
+- **Supplier POs**: manager approval, over-ordering warning, print view for the supplier, sent / cancelled.
+- **Suppliers** with categories, payment terms and lead time.
+
 **ERP**
 - **Companies** – run more than one business entity (e.g. a manufacturing company and an export company).
 - **Employees & departments** – employee code, designation, salary, monthly sales target, status.
@@ -116,6 +125,7 @@ backend/
     accounts/       User model (with role), login API, permissions
     companies/      Company model + seed_demo command
     employees/      Department, Employee
+    procurement/    Suppliers, material requirements, RFQs with quote comparison, supplier POs (services.py)
     development/    Tech packs (measurements, BOM, revisions), samples, measurement check (services.py)
     merchandising/  Cost sheets, quotations, order confirmations, credit-limit check (services.py)
     buyers/         Buyer onboarding: enquiry, buyer, contacts, requirements, credit checks, approval (services.py)

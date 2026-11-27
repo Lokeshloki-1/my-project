@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import api, { errorMessage } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import FormField from '../components/FormField'
@@ -10,6 +10,7 @@ import History from '../components/merch/History'
 import ReasonDialog from '../components/merch/ReasonDialog'
 import { money } from '../components/merch/constants'
 import { PAYMENT_TERMS, fmtDate, fmtDateTime, labelOf } from '../components/buyers/constants'
+import { GenerateDialog } from './MaterialRequirements'
 
 const FIELDS = [
   { name: 'buyer_po_no', label: 'Buyer PO number', required: true },
@@ -51,6 +52,7 @@ function CreditPanel({ credit, currency }) {
 export default function OrderDetail() {
   const { id } = useParams()
   const { canManage } = useAuth()
+  const navigate = useNavigate()
   const [order, setOrder] = useState(null)
   const [form, setForm] = useState(null)
   const [error, setError] = useState('')
@@ -62,6 +64,8 @@ export default function OrderDetail() {
   const load = useCallback(() => api.get(`/order-confirmations/${id}/`).then((r) => apply(r.data)).catch((e) => setError(errorMessage(e))), [id])
   useEffect(() => { load() }, [load])
   const sheets = useOptions(order ? '/cost-sheets/' : null, order ? { buyer: order.buyer, status: 'approved', currency: order.currency } : null)
+  const requirements = useOptions(order?.status === 'confirmed' ? '/material-requirements/' : null, order?.status === 'confirmed' ? { order: order.id } : null)
+  const [generating, setGenerating] = useState(false)
 
   if (!form) return error ? <div className="error">{error}</div> : <div className="muted">Loading…</div>
 
@@ -118,6 +122,9 @@ export default function OrderDetail() {
         <div className="actions">
           {can('cancel') && <button className="secondary" onClick={() => setDialog('cancel')} disabled={busy}>Cancel order</button>}
           {can('confirm') && <button className="approve" onClick={confirm} disabled={busy}>Confirm order</button>}
+          {order.status === 'confirmed' && (requirements[0]
+            ? <Link className="button secondary" to={`/requirements/${requirements[0].id}`}>Materials: {requirements[0].mr_no} →</Link>
+            : <button onClick={() => setGenerating(true)}>Calculate materials</button>)}
         </div>
       </div>
 
@@ -165,6 +172,7 @@ export default function OrderDetail() {
         </aside>
       </div>
 
+      {generating && <GenerateDialog orderId={order.id} onClose={() => setGenerating(false)} onDone={(mr) => navigate(`/requirements/${mr.id}`)} />}
       {dialog && <ReasonDialog {...dialogs[dialog]} busy={busy} onClose={() => setDialog(null)} onConfirm={dialogs[dialog].run} />}
     </>
   )

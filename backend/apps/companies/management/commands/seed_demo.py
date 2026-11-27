@@ -25,6 +25,8 @@ from apps.ddp.models import Shipment
 from apps.development import services as dev
 from apps.development.models import BOMItem, Measurement, Sample, TechPack
 from apps.merchandising import services as merch
+from apps.procurement import services as proc
+from apps.procurement.models import PurchaseOrder, PurchaseOrderLine, RFQ, RFQLine, Supplier
 from apps.merchandising.models import CostSheet, CostSheetLine, OrderConfirmation, Quotation, QuotationLine
 from apps.employees.models import Department, Employee
 from apps.inventory.models import StockMovement, Warehouse
@@ -132,6 +134,7 @@ class Command(BaseCommand):
         self._seed_buyers(companies[0], today)
         self._seed_merchandising(today)
         self._seed_development(today)
+        self._seed_procurement(today)
         self.stdout.write(self.style.SUCCESS("Demo data created. Login: admin / admin12345"))
 
     def _seed_buyers(self, company, today):
@@ -278,14 +281,16 @@ class Command(BaseCommand):
             for i, (code, point, tol, vals) in enumerate(poms):
                 Measurement.objects.create(tech_pack=tp, position=i, code=code, point=point, tolerance=Decimal(tol),
                                            values={sz: str(v) for sz, v in zip(sizes, vals)})
-            for i, (cat, desc, supplier, place) in enumerate([
-                ("fabric", f"{gsm} GSM organic cotton", "Tiruppur Knit Fabrics", "Body"),
-                ("label", "Woven main label", "Avery Dennison", "Back neck"),
-                ("label", "Care label (GOTS)", "Avery Dennison", "Left side seam"),
-                ("thread", "Polyester core-spun thread", "Coats", "All seams"),
-                ("packaging", "Recycled polybag", "Local", ""),
+            fabric_kg = "0.18" if gsm < 200 else "0.42"
+            for i, (cat, desc, supplier, place, cons, unit) in enumerate([
+                ("fabric", f"{gsm} GSM organic cotton", "Tiruppur Knit Fabrics", "Body", fabric_kg, "kg"),
+                ("label", "Woven main label", "Avery Dennison", "Back neck", "1", "pc"),
+                ("label", "Care label (GOTS)", "Avery Dennison", "Left side seam", "1", "pc"),
+                ("thread", "Polyester core-spun thread", "Coats", "All seams", "150", "m"),
+                ("packaging", "Recycled polybag", "Local", "", "1", "pc"),
             ]):
-                BOMItem.objects.create(tech_pack=tp, position=i, category=cat, description=desc, supplier=supplier, placement=place)
+                BOMItem.objects.create(tech_pack=tp, position=i, category=cat, description=desc, supplier=supplier,
+                                       placement=place, consumption=Decimal(cons), unit=unit)
             dev.log("tech_pack", tp, "created", sales)
             dev.release_tech_pack(tp, manager)
             packs.append(tp)
@@ -318,6 +323,57 @@ class Command(BaseCommand):
         sample(hood, "proto", "Heather grey", 3, 7)
         late = sample(hood, "salesman", "Navy", 15, -2)
         dev.start_sample(late, sales)
+
+    def _seed_procurement(self, today):
+        """Suppliers, a material requirement from the confirmed order, an awarded RFQ and POs."""
+        sales = User.objects.get(username="sales")
+        manager = User.objects.get(username="manager")
+        order = OrderConfirmation.objects.get(buyer_po_no="NT-PO-2026-118")
+        company = order.company
+        if order.status == OrderConfirmation.Status.DRAFT:
+            merch.confirm_order(order, manager)
+        suppliers = {
+            name: Supplier.objects.create(company=company, name=name, city=city, contact_name=contact,
+                                          email=f"sales@{name.split()[0].lower()}.example", categories=cats,
+                                          payment_terms=terms, lead_time_days=lead, tax_id=gst)
+            for name, city, contact, cats, terms, lead, gst in [
+                ("Tiruppur Knit Fabrics", "Tiruppur", "R. Senthil", ["fabric"], "30 days credit", 21, "33AABCT1234F1Z5"),
+                ("Erode Organic Mills", "Erode", "K. Lakshmi", ["fabric"], "45 days credit", 25, "33AACCE5678G1Z2"),
+                ("Coimbatore Cotton Textiles", "Coimbatore", "M. Prakash", ["fabric", "thread"], "30 days credit", 18, "33AADCC9012H1Z8"),
+                ("Avery Dennison India", "Bengaluru", "S. Rao", ["label", "trim"], "Advance", 10, "29AAACA3456J1Z1"),
+                ("Coats India", "Chennai", "P. Nair", ["thread"], "30 days credit", 7, "33AAACC7890K1Z4"),
+            ]
+        }
+        mr, _ = proc.generate_requirement(order, sales, Decimal("5"))
+        proc.approve_requirement(mr, manager)
+        lines = list(mr.lines.all())
+        fabric = [line for line in lines if line.category == "fabric"]
+        rfq = RFQ.objects.create(company=company, requirement=mr, title=f"Organic cotton fabric for {order.oc_no}",
+                                 reply_by=today + timedelta(days=5), required_by=mr.needed_by, created_by=sales,
+                                 notes="GOTS certified. Prices ex-mill Tiruppur, including dyeing.")
+        rfq.suppliers.set([suppliers["Tiruppur Knit Fabrics"], suppliers["Erode Organic Mills"], suppliers["Coimbatore Cotton Textiles"]])
+        rfq_lines = [RFQLine.objects.create(rfq=rfq, requirement_line=line, category=line.category, description=line.description,
+                                            colour=line.colour, unit=line.unit, quantity=line.required_qty, position=i)
+                     for i, line in enumerate(fabric)]
+        proc.log("rfq", rfq, "created", sales)
+        proc.send_rfq(rfq, sales)
+        for name, prices, lead in [("Tiruppur Knit Fabrics", ["545", "585"], 21), ("Erode Organic Mills", ["520", "575"], 25),
+                                   ("Coimbatore Cotton Textiles", ["560"], 18)]:
+            proc.record_quote(rfq, sales, suppliers[name], {"currency": "INR", "payment_terms": suppliers[name].payment_terms,
+                                                            "valid_until": today + timedelta(days=30), "notes": ""},
+                              [{"rfq_line": rl, "unit_price": Decimal(p), "lead_time_days": lead} for rl, p in zip(rfq_lines, prices)])
+        po = proc.award_rfq(rfq, manager, suppliers["Erode Organic Mills"])
+        proc.approve_po(po, manager)
+        proc.send_po(po, sales)
+        labels = [line for line in lines if line.category == "label"]
+        po2 = PurchaseOrder.objects.create(company=company, supplier=suppliers["Avery Dennison India"], requirement=mr,
+                                           order_date=today, delivery_date=today + timedelta(days=12), currency="INR",
+                                           payment_terms="Advance", delivery_address=company.address, created_by=sales)
+        for i, (line, price) in enumerate(zip(labels, ["2.40", "1.10"])):
+            PurchaseOrderLine.objects.create(order=po2, requirement_line=line, category=line.category, description=line.description,
+                                             unit=line.unit, quantity=line.required_qty, unit_price=Decimal(price), position=i)
+        po2.recalculate()
+        proc.log("po", po2, "created", sales)
 
     def _issue_with_restock(self, order):
         """Take stock for the order; if a product is short, record a restock receipt first (like a purchase)."""
