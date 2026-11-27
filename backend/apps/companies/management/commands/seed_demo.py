@@ -30,6 +30,8 @@ from apps.stores import services as stores
 from apps.stores.models import MaterialAllocation
 from apps.production import services as prod
 from apps.quality import services as qa
+from apps.exports import services as exp
+from apps.exports.models import CartonGroup, ExportShipment, PackingList
 from apps.quality.models import DefectType, FinalInspection
 from apps.production.models import ProductionLine, ProductionOrder
 from apps.stores.models import GoodsReceipt, GoodsReceiptLine
@@ -145,6 +147,7 @@ class Command(BaseCommand):
         self._seed_stores(today)
         self._seed_production(today)
         self._seed_quality(today)
+        self._seed_exports(today)
         self.stdout.write(self.style.SUCCESS("Demo data created. Login: admin / admin12345"))
 
     def _seed_buyers(self, company, today):
@@ -491,6 +494,35 @@ class Command(BaseCommand):
         re.save(update_fields=["checklist"])
         qa.save_final_defects(re, [(d["S01"], "major", 2), (d["P02"], "minor", 3)])
         qa.submit_final(re, manager)
+
+    def _seed_exports(self, today):
+        """A finalized packing list for the inspected NT-101 lot and a booked sea shipment."""
+        sales = User.objects.get(username="sales")
+        wo = ProductionOrder.objects.get(style_no="NT-101", status="in_progress")
+        order = wo.order
+        pl = PackingList.objects.create(company=order.company, order=order, pack_date=today, method="solid", created_by=sales,
+                                        shipping_marks=f"{order.buyer.legal_name}\nPO: {order.buyer_po_no}\nStyle: NT-101 Kids organic tee\n"
+                                                       "Colour: Navy\nCarton no.: __ of 100\nMade in India")
+        start = 1
+        for size, cartons in zip(wo.sizes, [10, 17, 20, 20, 18, 15]):
+            CartonGroup.objects.create(packing_list=pl, production_order=wo, style_no=wo.style_no, colourway=wo.colourway,
+                                       from_carton=start, to_carton=start + cartons - 1, sizes={size: 24},
+                                       net_weight=Decimal("4.2"), gross_weight=Decimal("4.9"),
+                                       length_cm=Decimal("58"), width_cm=Decimal("38"), height_cm=Decimal("28"))
+            start += cartons
+        pl.recalculate()
+        exp.log("packing_list", pl, "created", sales)
+        pl = exp.finalize_packing_list(pl, sales)
+        shipment = ExportShipment.objects.create(company=order.company, order=order, mode="sea", port_of_loading="Chennai, India",
+                                                 port_of_discharge="Gothenburg, Sweden", final_destination="Stockholm, Sweden",
+                                                 forwarder="Kuehne+Nagel Chennai", carrier="Maersk", vessel="Maersk Kalmar",
+                                                 voyage="248W", container_type="20GP", etd=today + timedelta(days=6),
+                                                 eta=today + timedelta(days=36), hs_codes={"NT-101": "61091000", "NT-205": "61102000"},
+                                                 created_by=sales)
+        exp.create_documents(shipment)
+        exp.attach_packing_lists(shipment, [pl], sales)
+        exp.log("shipment", shipment, "created", sales)
+        exp.book_shipment(shipment, sales)
 
     def _issue_with_restock(self, order):
         """Take stock for the order; if a product is short, record a restock receipt first (like a purchase)."""

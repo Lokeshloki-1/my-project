@@ -30,6 +30,7 @@ from apps.quality.views import (
     InlineInspectionViewSet,
     QualitySummaryViewSet,
 )
+from apps.exports.views import ExportDocumentViewSet, ExportShipmentViewSet, PackingListViewSet
 from apps.companies.views import CompanyViewSet
 from apps.ddp.views import ShipmentViewSet
 from apps.employees.views import DepartmentViewSet, EmployeeViewSet
@@ -75,6 +76,9 @@ router.register("defect-types", DefectTypeViewSet)
 router.register("inline-inspections", InlineInspectionViewSet)
 router.register("final-inspections", FinalInspectionViewSet)
 router.register("corrective-actions", CorrectiveActionViewSet)
+router.register("packing-lists", PackingListViewSet)
+router.register("export-shipments", ExportShipmentViewSet)
+router.register("export-documents", ExportDocumentViewSet)
 router.register("quality-summary", QualitySummaryViewSet, basename="quality-summary")
 
 def health(request):

@@ -123,6 +123,7 @@ export default function OrderDetail() {
           {can('cancel') && <button className="secondary" onClick={() => setDialog('cancel')} disabled={busy}>Cancel order</button>}
           {can('confirm') && <button className="approve" onClick={confirm} disabled={busy}>Confirm order</button>}
           {order.status === 'confirmed' && <Link className="button secondary" to={`/production/new?order=${order.id}`}>Plan production</Link>}
+          {order.status === 'confirmed' && <Link className="button secondary" to={`/packing/new?order=${order.id}`}>Packing list</Link>}
           {order.status === 'confirmed' && (requirements[0]
             ? <Link className="button secondary" to={`/requirements/${requirements[0].id}`}>Materials: {requirements[0].mr_no} →</Link>
             : <button onClick={() => setGenerating(true)}>Calculate materials</button>)}

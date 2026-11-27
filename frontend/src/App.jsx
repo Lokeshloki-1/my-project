@@ -48,6 +48,8 @@ import DefectControl from './pages/DefectControl'
 import InlineQC from './pages/InlineQC'
 import FinalInspections from './pages/FinalInspections'
 import DefectTypes from './pages/DefectTypes'
+import PackingLists from './pages/PackingLists'
+import ExportShipments from './pages/ExportShipments'
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
@@ -101,6 +103,10 @@ export default function App() {
         <Route path="quality/final" element={<FinalInspections />} />
         <Route path="quality/final/:id" element={<FinalInspections key="fi" />} />
         <Route path="quality/defects" element={<DefectTypes />} />
+        <Route path="packing" element={<PackingLists />} />
+        <Route path="packing/:id" element={<PackingLists key="pl" />} />
+        <Route path="shipments" element={<ExportShipments />} />
+        <Route path="shipments/:id" element={<ExportShipments key="sh" />} />
         <Route path="companies" element={<Companies />} />
         <Route path="employees" element={<Employees />} />
         <Route path="customers" element={<Customers />} />

@@ -81,6 +81,15 @@ stock and warehouses, invoices and payments, monthly sales reports and **DDP (De
 - **Defect control**: Pareto chart of the top defects, DHU by line and by style, final pass rate, and corrective
   actions with owners, due dates and manager close-out (root cause + action).
 
+**Packing & export: packing list → shipping → export documents** (textile flow, step 8 — [API reference](docs/api/packing-export.md))
+- **Packing lists** with carton ranges, pieces per size per carton, net/gross weight and carton size; totals in cartons,
+  pieces, kg and CBM; PDF with shipping marks. **Only pieces that passed final inspection can be packed.**
+- **Export shipments** (sea / air / road / courier): ports, forwarder, vessel or flight, container and seal, B/L or AWB,
+  shipping bill; planned → booked → shipped → delivered with the checks each step needs.
+- **Export documents**: a checklist per shipment (invoice, packing list, shipping bill, B/L, certificate of origin,
+  inspection and insurance certificates, beneficiary certificate) and a **commercial invoice PDF** with HS codes and
+  the amount in words.
+
 **ERP**
 - **Companies** – run more than one business entity (e.g. a manufacturing company and an export company).
 - **Employees & departments** – employee code, designation, salary, monthly sales target, status.
@@ -155,6 +164,7 @@ backend/
     accounts/       User model (with role), login API, permissions
     companies/      Company model + seed_demo command
     employees/      Department, Employee
+    exports/        Packing lists, export shipments, export documents, invoice & packing-list PDFs
     quality/        Defect library, inline QC (DHU), AQL final inspection (aql.py), corrective actions, summary
     production/     Sewing lines, work orders, cutting / sewing / finishing output, daily report (services.py)
     stores/         Raw materials: goods receipts, inspection, material stock ledger, allocation (services.py)

@@ -23,6 +23,32 @@ S = ProductionOrder.Status
 E = ProductionEntry.Stage
 
 
+SIZE_ORDER = ["XXXS", "XXS", "XS", "S", "M", "L", "XL", "XXL", "2XL", "XXXL", "3XL", "4XL", "5XL"]
+
+
+def size_key(size):
+    """Sort key for garment sizes: 0-3M < … < 2Y < 4Y … < XS < S < M < L < XL …; numbers by value."""
+    s = str(size).strip().upper()
+    if s in SIZE_ORDER:
+        return (2, SIZE_ORDER.index(s), s)
+    digits = "".join(ch for ch in s.split("-")[0] if ch.isdigit())
+    if digits:
+        months = s.endswith("M") and not s.endswith("XM")
+        return (0 if months else 1, int(digits), s)
+    return (3, 0, s)
+
+
+def ordered_sizes(sizes, reference=None):
+    """Sizes in garment order. The database doesn't keep JSON key order, so never rely on dict order."""
+    ref = [s for s in (reference or []) if s in sizes]
+    rest = sorted((s for s in sizes if s not in ref), key=size_key)
+    return ref + rest
+
+
+def wo_sizes(wo):
+    return ordered_sizes(wo.sizes, wo.tech_pack.sizes if wo.tech_pack_id else None)
+
+
 def log(wo, action, user, note=""):
     ActivityLog.objects.create(production_order=wo, action=action, user=user, note=note)
     logger.info("work_order %s %s user=%s", wo.pk, action, getattr(user, "pk", None))
@@ -158,7 +184,7 @@ def wo_actions(wo, user):
 
 
 def _lock(wo):
-    return ProductionOrder.objects.select_for_update().select_related("line", "order").get(pk=wo.pk)
+    return ProductionOrder.objects.select_for_update(of=("self",)).select_related("line", "order").get(pk=wo.pk)
 
 
 @transaction.atomic

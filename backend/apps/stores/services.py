@@ -245,7 +245,7 @@ def _finish(alloc):
 
 
 def _locked_allocation(alloc):
-    alloc = MaterialAllocation.objects.select_for_update().select_related("material", "warehouse", "order").get(pk=alloc.pk)
+    alloc = MaterialAllocation.objects.select_for_update(of=("self",)).select_related("material", "warehouse", "order").get(pk=alloc.pk)
     if alloc.status != MaterialAllocation.Status.ACTIVE:
         raise Conflict(f"This allocation is already {alloc.get_status_display().lower()}.")
     return alloc

@@ -213,10 +213,10 @@ function WorkOrder({ id }) {
             <h2>Sizes</h2>
             <div className="table-wrap">
               <table className="cost-lines">
-                <thead><tr><th>Size</th>{Object.keys(wo.sizes).map((s) => <th key={s} className="num">{s}</th>)}<th className="num">Total</th></tr></thead>
+                <thead><tr><th>Size</th>{wo.size_order.map((s) => <th key={s} className="num">{s}</th>)}<th className="num">Total</th></tr></thead>
                 <tbody>
-                  <tr><td>Planned</td>{Object.entries(wo.sizes).map(([s, v]) => <td key={s} className="num">{pcs(v)}</td>)}<td className="num"><b>{pcs(wo.quantity)}</b></td></tr>
-                  <tr><td>Cut</td>{Object.keys(wo.sizes).map((s) => {
+                  <tr><td>Planned</td>{wo.size_order.map((s) => <td key={s} className="num">{pcs(wo.sizes[s])}</td>)}<td className="num"><b>{pcs(wo.quantity)}</b></td></tr>
+                  <tr><td>Cut</td>{wo.size_order.map((s) => {
                     const c = p.cut_sizes[s] || 0
                     return <td key={s} className={`num ${c >= wo.sizes[s] ? 'pos' : ''}`}>{pcs(c)}</td>
                   })}<td className="num"><b>{pcs(p.cut)}</b></td></tr>
@@ -320,7 +320,7 @@ function RecordOutput({ wo, stage, setStage, onSaved }) {
       </div>
       {stage === 'cutting' && (
         <div className="size-grid">
-          {Object.keys(wo.sizes).map((s) => (
+          {wo.size_order.map((s) => (
             <label key={s} className="field"><span>{s} <small className="muted">(≤ {pcs(Math.max(limit(s), 0))})</small></span>
               <input className="num" type="number" min="0" max={Math.max(limit(s), 0)} value={form.sizes[s] ?? ''} onChange={(e) => set('sizes', { ...form.sizes, [s]: e.target.value })} aria-label={`Cut ${s}`} /></label>
           ))}

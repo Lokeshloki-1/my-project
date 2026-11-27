@@ -121,7 +121,7 @@ def final_actions(fi, user):
 
 @transaction.atomic
 def submit_final(fi, user):
-    fi = FinalInspection.objects.select_for_update().select_related("production_order").get(pk=fi.pk)
+    fi = FinalInspection.objects.select_for_update(of=("self",)).select_related("production_order").get(pk=fi.pk)
     if fi.status != FinalInspection.Status.DRAFT:
         raise Conflict("This inspection is already completed.")
     keys = [k for k, _ in FinalInspection.CHECKLIST]

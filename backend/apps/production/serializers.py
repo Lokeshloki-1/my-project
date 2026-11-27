@@ -67,6 +67,7 @@ class ProductionOrderSerializer(serializers.ModelSerializer):
     tp_no = serializers.CharField(source="tech_pack.tp_no", read_only=True, default=None)
     production_approved = serializers.BooleanField(source="tech_pack.production_approved", read_only=True, default=False)
     status_label = serializers.CharField(source="get_status_display", read_only=True)
+    size_order = serializers.SerializerMethodField()
     capacity = serializers.SerializerMethodField()
     progress = serializers.SerializerMethodField()
     warnings = serializers.SerializerMethodField()
@@ -82,13 +83,16 @@ class ProductionOrderSerializer(serializers.ModelSerializer):
         model = ProductionOrder
         fields = [
             "id", "wo_no", "company", "order", "oc_no", "buyer_name", "ship_date", "order_line", "order_line_quantity",
-            "tech_pack", "tp_no", "production_approved", "style_no", "style_name", "colourway", "quantity", "sizes",
+            "tech_pack", "tp_no", "production_approved", "style_no", "style_name", "colourway", "quantity", "sizes", "size_order",
             "line", "line_name", "smv", "planned_start", "planned_end", "cut_allowance_pct", "notes", "status",
             "status_label", "started_at", "completed_at", "close_reason", "capacity", "progress", "warnings",
             "allowed_actions", "entries", "materials", "history", "created_at", "updated_at",
         ]
         read_only_fields = ["wo_no", "company", "style_no", "status", "started_at", "completed_at", "close_reason",
                             "created_at", "updated_at"]
+
+    def get_size_order(self, obj):
+        return services.wo_sizes(obj)
 
     def get_capacity(self, obj):
         return services.capacity(obj.line, obj.smv, obj.quantity, obj.planned_start)

@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 from decimal import Decimal
 
+from django.test import SimpleTestCase
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
@@ -178,3 +179,12 @@ class ProductionTests(APITestCase):
         res = self.client.get(f"/api/production-orders/capacity/?line={self.line.id}&smv=12&quantity=3000&start=2026-11-30")
         self.assertEqual((res.data["daily_target"], res.data["working_days"]), (720, 5))
         self.assertEqual(res.data["suggested_end"], date(2026, 12, 4))
+
+
+class SizeOrderTests(SimpleTestCase):
+    def test_garment_size_order(self):
+        from .services import ordered_sizes
+        self.assertEqual(ordered_sizes({"L": 1, "S": 1, "XL": 1, "M": 1}), ["S", "M", "L", "XL"])
+        self.assertEqual(ordered_sizes({"12Y": 1, "2Y": 1, "10Y": 1, "4Y": 1}), ["2Y", "4Y", "10Y", "12Y"])
+        self.assertEqual(ordered_sizes({"6-12M": 1, "0-3M": 1, "3-6M": 1}), ["0-3M", "3-6M", "6-12M"])
+        self.assertEqual(ordered_sizes({"A": 1, "B": 1}, ["B", "A"]), ["B", "A"])     # tech pack order wins
