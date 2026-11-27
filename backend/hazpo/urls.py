@@ -23,6 +23,13 @@ from apps.stores.views import (
     MaterialViewSet,
 )
 from apps.production.views import ProductionEntryViewSet, ProductionLineViewSet, ProductionOrderViewSet
+from apps.quality.views import (
+    CorrectiveActionViewSet,
+    DefectTypeViewSet,
+    FinalInspectionViewSet,
+    InlineInspectionViewSet,
+    QualitySummaryViewSet,
+)
 from apps.companies.views import CompanyViewSet
 from apps.ddp.views import ShipmentViewSet
 from apps.employees.views import DepartmentViewSet, EmployeeViewSet
@@ -64,6 +71,11 @@ router.register("material-allocations", AllocationViewSet)
 router.register("production-lines", ProductionLineViewSet)
 router.register("production-orders", ProductionOrderViewSet)
 router.register("production-entries", ProductionEntryViewSet)
+router.register("defect-types", DefectTypeViewSet)
+router.register("inline-inspections", InlineInspectionViewSet)
+router.register("final-inspections", FinalInspectionViewSet)
+router.register("corrective-actions", CorrectiveActionViewSet)
+router.register("quality-summary", QualitySummaryViewSet, basename="quality-summary")
 
 def health(request):
     """For uptime monitors and Docker: 200 when the app and database are working."""

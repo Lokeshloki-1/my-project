@@ -44,6 +44,10 @@ import ProductionPlan from './pages/ProductionPlan'
 import ProductionOrderDetail from './pages/ProductionOrderDetail'
 import DailyOutput from './pages/DailyOutput'
 import ProductionLines from './pages/ProductionLines'
+import DefectControl from './pages/DefectControl'
+import InlineQC from './pages/InlineQC'
+import FinalInspections from './pages/FinalInspections'
+import DefectTypes from './pages/DefectTypes'
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
@@ -92,6 +96,11 @@ export default function App() {
         <Route path="production/daily" element={<DailyOutput />} />
         <Route path="production/lines" element={<ProductionLines />} />
         <Route path="production/:id" element={<ProductionOrderDetail />} />
+        <Route path="quality" element={<DefectControl />} />
+        <Route path="quality/inline" element={<InlineQC />} />
+        <Route path="quality/final" element={<FinalInspections />} />
+        <Route path="quality/final/:id" element={<FinalInspections key="fi" />} />
+        <Route path="quality/defects" element={<DefectTypes />} />
         <Route path="companies" element={<Companies />} />
         <Route path="employees" element={<Employees />} />
         <Route path="customers" element={<Customers />} />

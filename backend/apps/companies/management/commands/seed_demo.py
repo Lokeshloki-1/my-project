@@ -29,6 +29,8 @@ from apps.procurement import services as proc
 from apps.stores import services as stores
 from apps.stores.models import MaterialAllocation
 from apps.production import services as prod
+from apps.quality import services as qa
+from apps.quality.models import DefectType, FinalInspection
 from apps.production.models import ProductionLine, ProductionOrder
 from apps.stores.models import GoodsReceipt, GoodsReceiptLine
 from apps.procurement.models import PurchaseOrder, PurchaseOrderLine, RFQ, RFQLine, Supplier
@@ -142,6 +144,7 @@ class Command(BaseCommand):
         self._seed_procurement(today)
         self._seed_stores(today)
         self._seed_production(today)
+        self._seed_quality(today)
         self.stdout.write(self.style.SUCCESS("Demo data created. Login: admin / admin12345"))
 
     def _seed_buyers(self, company, today):
@@ -450,6 +453,44 @@ class Command(BaseCommand):
                                              planned_end=prod.capacity(lines[1], Decimal("22"), 3000, start)["suggested_end"],
                                              created_by=sales)
         prod.log(hwo, "planned", sales, f"3000 pcs on {lines[1].name}")
+
+    def _seed_quality(self, today):
+        """Defect library, a week of inline checks on Line 1 and a failed then passed final inspection."""
+        sales = User.objects.get(username="sales")
+        manager = User.objects.get(username="manager")
+        wo = ProductionOrder.objects.get(style_no="NT-101", status="in_progress")
+        qa.ensure_default_defects(wo.company)
+        d = {x.code: x for x in DefectType.objects.filter(company=wo.company)}
+        days = sorted({e.date for e in wo.entries.filter(stage="sewing")})
+        checks = [
+            ("Side seam", "Op 12 Lakshmi", 40, [("S01", 1)]), ("Neck rib attach", "Op 4 Ravi", 40, [("S04", 2)]),
+            ("Hemming", "Op 18 Meena", 30, [("S05", 1), ("S02", 1)]), ("Shoulder join", "Op 7 Kumar", 20, [("S03", 2), ("S01", 2)]),
+            ("Side seam", "Op 12 Lakshmi", 40, []), ("Neck rib attach", "Op 4 Ravi", 40, [("S04", 1)]),
+            ("Sleeve attach", "Op 9 Priya", 40, [("S06", 1), ("P02", 2)]), ("Hemming", "Op 18 Meena", 40, [("S05", 1)]),
+        ]
+        red = None
+        for i, (op, operator, pieces, defects) in enumerate(checks):
+            total = sum(c for _, c in defects)
+            insp = qa.create_inline(sales, wo, wo.line, {
+                "date": days[min(i // 2, len(days) - 1)], "operation": op, "operator": operator, "pieces_checked": pieces,
+                "defective_pieces": min(total, max(1, total - 1)) if total else 0,
+                "action_taken": "Machine stopped, needle and tension corrected, operator re-trained" if op == "Shoulder join" else "",
+            }, [(d[c], n) for c, n in defects])
+            red = red or (insp if insp.result == "red" else None)
+        if red:
+            qa.close_capa(red.corrective_action, manager, "Blunt needle and loose looper tension on overlock 7",
+                          "Needle changed, tension set; first 20 pcs checked after every needle change")
+        fi = FinalInspection.objects.create(company=wo.company, production_order=wo, inspection_date=today - timedelta(days=1),
+                                            inspected_by_party="Own QA", lot_size=2500, inspector=manager,
+                                            checklist={k: True for k, _ in FinalInspection.CHECKLIST},
+                                            **qa.build_plan(2500, "2.5", "4.0"))
+        qa.save_final_defects(fi, [(d["S01"], "major", 5), (d["F04"], "major", 4), (d["P02"], "minor", 6)])
+        qa.submit_final(fi, manager)
+        re = qa.reinspect(fi, manager)
+        re.checklist = {k: True for k, _ in FinalInspection.CHECKLIST}
+        re.save(update_fields=["checklist"])
+        qa.save_final_defects(re, [(d["S01"], "major", 2), (d["P02"], "minor", 3)])
+        qa.submit_final(re, manager)
 
     def _issue_with_restock(self, order):
         """Take stock for the order; if a product is short, record a restock receipt first (like a purchase)."""

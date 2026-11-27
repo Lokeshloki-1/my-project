@@ -71,6 +71,16 @@ stock and warehouses, invoices and payments, monthly sales reports and **DDP (De
 - **Daily output** per line: target vs actual and efficiency.
 - The work order shows which materials have been issued to production by the stores.
 
+**Quality: inline QC → final inspection → defect control** (textile flow, step 7 — [API reference](docs/api/quality.md))
+- **Defect library** (20 standard garment defects to start with) with category and default severity.
+- **Inline QC** on sewing lines: pieces checked, defects with quick counters, live **DHU** with a green / amber / red
+  light; a red check opens a corrective action.
+- **Final inspection (AQL)**: sample size and accept/reject numbers from the AQL chart (General Level II),
+  critical / major / minor defects, a packing & label checklist, a pass or fail verdict with reasons, and
+  re-inspection rounds.
+- **Defect control**: Pareto chart of the top defects, DHU by line and by style, final pass rate, and corrective
+  actions with owners, due dates and manager close-out (root cause + action).
+
 **ERP**
 - **Companies** – run more than one business entity (e.g. a manufacturing company and an export company).
 - **Employees & departments** – employee code, designation, salary, monthly sales target, status.
@@ -145,6 +155,7 @@ backend/
     accounts/       User model (with role), login API, permissions
     companies/      Company model + seed_demo command
     employees/      Department, Employee
+    quality/        Defect library, inline QC (DHU), AQL final inspection (aql.py), corrective actions, summary
     production/     Sewing lines, work orders, cutting / sewing / finishing output, daily report (services.py)
     stores/         Raw materials: goods receipts, inspection, material stock ledger, allocation (services.py)
     procurement/    Suppliers, material requirements, RFQs with quote comparison, supplier POs (services.py)

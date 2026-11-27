@@ -184,6 +184,8 @@ function WorkOrder({ id }) {
             {wo.tech_pack && <> · <Link to={`/tech-packs/${wo.tech_pack}`}>{wo.tp_no}</Link></>}</p>
         </div>
         <div className="actions">
+          {wo.status === 'in_progress' && <Link className="button secondary" to={`/quality/inline?wo=${wo.id}`}>Inline QC check</Link>}
+          {['in_progress', 'completed'].includes(wo.status) && p.finished >= 2 && <Link className="button secondary" to={`/quality/final/new?wo=${wo.id}`}>Final inspection</Link>}
           {can('cancel') && <button className="secondary" onClick={() => setDialog('cancel')} disabled={busy}>Cancel</button>}
           {can('complete') && <button className="secondary" onClick={() => setDialog('complete')} disabled={busy}>Close work order</button>}
         </div>
