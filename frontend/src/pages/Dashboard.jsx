@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Link } from 'react-router-dom'
 import api, { errorMessage } from '../api/client'
+import { useAuth } from '../auth/AuthContext'
 import { money, shortMoney } from '../utils/format'
 
 export default function Dashboard() {
@@ -37,6 +39,8 @@ export default function Dashboard() {
         <Kpi label="Open DDP shipments" value={stats.open_ddp_shipments} />
       </div>
 
+      <BuyerOnboardingCard />
+
       <div className="grid-2">
         <div className="card">
           <h2>Monthly sales · {monthly.year}</h2>
@@ -67,6 +71,44 @@ export default function Dashboard() {
         </div>
       </div>
     </>
+  )
+}
+
+// Separate request so the main dashboard still shows if this one fails.
+function BuyerOnboardingCard() {
+  const { canManage, canFinance } = useAuth()
+  const [data, setData] = useState(null)
+  useEffect(() => { api.get('/buyers/pipeline/').then((res) => setData(res.data)).catch(() => setData(null)) }, [])
+  if (!data) return null
+  const count = Object.fromEntries(data.stages.map((s) => [s.status, s.count]))
+  const steps = [
+    ['Open enquiries', data.open_enquiries, '/buyer-enquiries'],
+    ['Registered', count.registered, '/buyers?status=registered'],
+    ['Pending credit', count.pending_credit, '/buyers?status=pending_credit'],
+    ['Credit failed', count.credit_failed, '/buyers?status=credit_failed'],
+    ['Pending approval', count.pending_approval, '/buyers?status=pending_approval'],
+    ['Approved', count.approved, '/buyers?status=approved'],
+  ]
+  const todo = canManage && count.pending_approval ? `${count.pending_approval} waiting for your approval`
+    : canFinance && count.pending_credit ? `${count.pending_credit} waiting for a credit check` : null
+  return (
+    <div className="card">
+      <div className="card-head">
+        <h2>Buyer onboarding</h2>
+        <div className="actions">
+          {todo && <span className="badge badge-b-pending_approval">{todo}</span>}
+          <Link to="/buyers/pipeline">Open pipeline →</Link>
+        </div>
+      </div>
+      <div className="funnel">
+        {steps.map(([label, n, to]) => (
+          <Link key={label} to={to} className="funnel-step">
+            <span className="kpi-value">{n ?? 0}</span>
+            <span className="muted small">{label}</span>
+          </Link>
+        ))}
+      </div>
+    </div>
   )
 }
 

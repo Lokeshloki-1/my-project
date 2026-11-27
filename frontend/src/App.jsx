@@ -15,6 +15,10 @@ import Payments from './pages/Payments'
 import Stock from './pages/Stock'
 import StockMovements from './pages/StockMovements'
 import Warehouses from './pages/Warehouses'
+import BuyerEnquiries from './pages/BuyerEnquiries'
+import Buyers from './pages/Buyers'
+import BuyerPipeline from './pages/BuyerPipeline'
+import BuyerDetail from './pages/BuyerDetail'
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
@@ -28,6 +32,10 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route element={<RequireAuth><Layout /></RequireAuth>}>
         <Route index element={<Dashboard />} />
+        <Route path="buyer-enquiries" element={<BuyerEnquiries />} />
+        <Route path="buyers" element={<Buyers />} />
+        <Route path="buyers/pipeline" element={<BuyerPipeline />} />
+        <Route path="buyers/:id" element={<BuyerDetail />} />
         <Route path="companies" element={<Companies />} />
         <Route path="employees" element={<Employees />} />
         <Route path="customers" element={<Customers />} />

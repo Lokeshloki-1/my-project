@@ -3,7 +3,9 @@ Fill the database with demo data so the dashboard has something to show.
 
     python manage.py seed_demo
 
-Creates a demo admin login:  admin / admin12345  (change it!)
+Creates demo logins (change them!):
+    admin / admin12345        sales / sales12345
+    manager / manager12345    accounts / accounts12345
 """
 
 import random
@@ -16,6 +18,8 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.billing.models import Invoice, Payment
+from apps.buyers import services as buyer_services
+from apps.buyers.models import Buyer, BuyerContact, BuyerEnquiry, BuyerRequirement
 from apps.companies.models import Company
 from apps.ddp.models import Shipment
 from apps.employees.models import Department, Employee
@@ -36,6 +40,9 @@ class Command(BaseCommand):
 
         if not User.objects.filter(username="admin").exists():
             User.objects.create_superuser("admin", "admin@example.com", "admin12345", role=User.Role.ADMIN)
+        for username, role in [("manager", User.Role.MANAGER), ("accounts", User.Role.ACCOUNTANT), ("sales", User.Role.SALES)]:
+            if not User.objects.filter(username=username).exists():
+                User.objects.create_user(username, password=f"{username}12345", role=role, first_name=username.title())
 
         companies = [
             Company.objects.create(name="Hazpo Industries Pvt Ltd", code="HZP-IN", city="Chennai", country="India", currency="INR"),
@@ -118,7 +125,62 @@ class Command(BaseCommand):
                     invoice_value=(order.subtotal * Decimal("1.25")).quantize(Decimal("0.01")),
                 )
 
+        self._seed_buyers(companies[0], today)
         self.stdout.write(self.style.SUCCESS("Demo data created. Login: admin / admin12345"))
+
+    def _seed_buyers(self, company, today):
+        """Garment buyers at each onboarding stage, moved through the real workflow functions."""
+        sales = User.objects.get(username="sales")
+        accounts = User.objects.get(username="accounts")
+        manager = User.objects.get(username="manager")
+        rows = [
+            # buyer, contact, country, city, source, categories, certifications, final stage
+            ("Nordic Threads AB", "Anna Berg", "Sweden", "Stockholm", "trade_fair", ["knits", "kidswear"], ["GOTS", "OEKO-TEX"], "approved"),
+            ("Maple Leaf Apparel Inc", "Liam Tremblay", "Canada", "Toronto", "email", ["wovens"], ["BSCI"], "pending_approval"),
+            ("Bayside Retail Ltd", "Olivia Smith", "United Kingdom", "Leeds", "website", ["denim"], ["WRAP", "SEDEX"], "pending_credit"),
+            ("Sonnen Mode GmbH", "Jonas Weber", "Germany", "Munich", "agent", ["activewear"], ["OEKO-TEX"], "credit_failed"),
+            ("Pacific Home Co", "Mia Chen", "Australia", "Sydney", "referral", ["home_textiles"], ["OEKO-TEX"], "registered"),
+            ("Iberia Kids SL", "Lucia Garcia", "Spain", "Madrid", "trade_fair", ["kidswear"], ["GOTS"], "enquiry"),
+            ("Atlas Fashion LLC", "Omar Haddad", "UAE", "Dubai", "email", ["knits"], [], "enquiry"),
+        ]
+        for i, (name, contact, country, city, source, cats, certs, stage) in enumerate(rows):
+            enquiry = BuyerEnquiry.objects.create(
+                company=company, source=source, buyer_name=name, contact_name=contact,
+                email=f"{contact.split()[0].lower()}@{name.split()[0].lower()}.example", country=country,
+                product_interest=", ".join(cats), expected_volume=20000 + i * 15000,
+                received_on=today - timedelta(days=40 - i * 5), assigned_to=sales,
+                status="qualified" if i % 2 else "new",
+            )
+            if stage == "enquiry":
+                continue
+            buyer, _ = buyer_services.convert_enquiry(enquiry, sales)
+            Buyer.objects.filter(pk=buyer.pk).update(
+                city=city, address=f"{10 + i} Harbour Street, {city}", buyer_type=random.choice(["brand", "retailer", "importer"]),
+                preferred_currency="EUR" if country in ("Germany", "Spain") else "USD", default_incoterm="FOB",
+            )
+            buyer.refresh_from_db()
+            BuyerContact.objects.create(buyer=buyer, name="Accounts Desk", department="accounts",
+                                        email=f"accounts@{name.split()[0].lower()}.example")
+            BuyerRequirement.objects.create(
+                buyer=buyer, product_categories=cats, certifications=certs, gsm_min=140, gsm_max=240,
+                fabric_composition="100% cotton", size_range="XS-XXL", annual_volume=enquiry.expected_volume,
+                target_price_min=Decimal("3.50"), target_price_max=Decimal("7.00"), price_currency=buyer.preferred_currency,
+                delivery_port="Chennai", testing_lab="SGS",
+            )
+            if stage == "registered":
+                continue
+            buyer_services.submit_buyer(buyer, sales)
+            if stage == "pending_credit":
+                continue
+            passed = stage != "credit_failed"
+            buyer_services.record_credit_check(
+                buyer, accounts, requested_limit=Decimal("75000"), approved_limit=Decimal("60000") if passed else 0,
+                currency="USD", payment_terms="lc_sight" if passed else "advance", risk_rating="low" if passed else "high",
+                result="pass" if passed else "fail", bank_reference="Bank confirms account in good standing" if passed else "",
+                remarks="" if passed else "Two trade references reported late payments",
+            )
+            if stage == "approved":
+                buyer_services.approve_buyer(buyer, manager)
 
     def _issue_with_restock(self, order):
         """Take stock for the order; if a product is short, record a restock receipt first (like a purchase)."""

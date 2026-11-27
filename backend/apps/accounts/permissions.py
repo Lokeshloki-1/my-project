@@ -21,3 +21,7 @@ class IsFinanceOrReadOnly(BasePermission):
         if request.method in SAFE_METHODS:
             return True
         return request.user.is_manager_or_admin or request.user.role == "accountant"
+
+
+class IsCreditReviewerOrReadOnly(IsFinanceOrReadOnly):
+    """Buyer credit checks: recorded by accountants, managers and admins; readable by everyone logged in."""

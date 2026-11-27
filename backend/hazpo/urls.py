@@ -4,6 +4,13 @@ from django.http import JsonResponse
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from apps.buyers.views import (
+    BuyerContactViewSet,
+    BuyerEnquiryViewSet,
+    BuyerRequirementViewSet,
+    BuyerViewSet,
+    CreditCheckViewSet,
+)
 from apps.billing.views import InvoiceViewSet, PaymentViewSet, RazorpayWebhookView
 from apps.companies.views import CompanyViewSet
 from apps.ddp.views import ShipmentViewSet
@@ -24,6 +31,11 @@ router.register("payments", PaymentViewSet)
 router.register("warehouses", WarehouseViewSet)
 router.register("stock-levels", StockLevelViewSet)
 router.register("stock-movements", StockMovementViewSet)
+router.register("buyer-enquiries", BuyerEnquiryViewSet)
+router.register("buyers", BuyerViewSet)
+router.register("buyer-contacts", BuyerContactViewSet)
+router.register("buyer-requirements", BuyerRequirementViewSet)
+router.register("credit-checks", CreditCheckViewSet)
 
 def health(request):
     """For uptime monitors and Docker: 200 when the app and database are working."""

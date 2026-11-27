@@ -1,6 +1,6 @@
 # Hazpo ERP
 
-A small ERP for managing companies, employees, customers, products, sales orders,
+A small ERP for textile exporters: buyer onboarding, companies, employees, customers, products, sales orders,
 stock and warehouses, invoices and payments, monthly sales reports and **DDP (Delivered Duty Paid)** export shipments.
 
 | Layer    | Technology |
@@ -10,6 +10,17 @@ stock and warehouses, invoices and payments, monthly sales reports and **DDP (De
 | Database | PostgreSQL 16 |
 
 ## Features
+
+**Buyer onboarding** (textile flow, step 1 — [API reference](docs/api/buyer-onboarding.md))
+- Buyer Enquiry → Registration → Profile → Contact Details → Requirements → Credit Verification → Approval.
+- **Enquiries** from email, trade fairs, agents or the website; *Convert to buyer* creates the buyer with its contact.
+- **Buyer page** with a 7-step progress bar that says exactly what is still missing, and tabs for profile,
+  contacts (one primary), requirements (product categories, GSM, sizes, target price, GOTS / OEKO-TEX / BSCI …),
+  credit checks and a timeline of every status change.
+- **Credit verification** by accounts: credit limit, payment terms (LC, TT, DA/DP, advance), risk rating,
+  bank/trade references, ECGC cover, pass or fail. Credit checks are never edited or deleted.
+- **Approval** by a manager or admin creates the **customer**, so only approved buyers can get orders and invoices.
+- **Buyer pipeline** board and a dashboard card showing how many buyers are at each step.
 
 **ERP**
 - **Companies** – run more than one business entity (e.g. a manufacturing company and an export company).
@@ -72,9 +83,9 @@ Only orders that are *confirmed*, *invoiced* or *paid* count as sales.
 **Roles**
 | Role | Can do |
 |------|--------|
-| `admin`, `manager` | everything, including editing companies, employees, products, warehouses, moving stock and deleting payments |
-| `accountant` | create invoices, record payments, cancel invoices; view everything |
-| `sales` | create customers, orders and shipments; view invoices, payments and stock |
+| `admin`, `manager` | everything, including approving or rejecting buyers, editing companies, employees, products, warehouses, moving stock and deleting payments |
+| `accountant` | record buyer credit checks, create invoices, record payments, cancel invoices; view everything |
+| `sales` | create enquiries and buyers and submit them for credit check, create customers, orders and shipments; view invoices, payments and stock |
 
 ## Project structure
 
@@ -85,6 +96,7 @@ backend/
     accounts/       User model (with role), login API, permissions
     companies/      Company model + seed_demo command
     employees/      Department, Employee
+    buyers/         Buyer onboarding: enquiry, buyer, contacts, requirements, credit checks, approval (services.py)
     sales/          Customer, Product, SalesOrder, SalesOrderItem
     billing/        Invoice, Payment, invoice PDF (pdf.py), Razorpay UPI QR (razorpay.py, upi.py)
     inventory/      Warehouse, StockLevel, StockMovement; services.py is the only code that changes stock
@@ -123,7 +135,7 @@ source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env               # then edit values if needed
 python manage.py migrate
-python manage.py seed_demo         # optional: demo data + login admin / admin12345
+python manage.py seed_demo         # optional: demo data + logins admin, manager, accounts, sales (password = name + 12345)
 python manage.py runserver
 ```
 Django admin panel: http://localhost:8000/admin/
