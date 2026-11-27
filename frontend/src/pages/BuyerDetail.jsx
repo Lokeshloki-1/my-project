@@ -126,7 +126,10 @@ function StatusNotice({ buyer }) {
       return (
         <div className="notice ok">
           <span>Approved by {buyer.approved_by_name} on {fmtDateTime(buyer.approved_at)}. This buyer is now a customer and can receive quotations and orders.</span>
-          <Link to="/customers">View customers →</Link>
+          <span className="actions">
+            <Link to={`/costing?buyer=${buyer.id}`}>Cost sheets</Link>
+            <Link to={`/quotations/new?buyer=${buyer.id}`}>New quotation →</Link>
+          </span>
         </div>
       )
     case 'rejected':

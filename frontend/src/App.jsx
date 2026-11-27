@@ -19,6 +19,12 @@ import BuyerEnquiries from './pages/BuyerEnquiries'
 import Buyers from './pages/Buyers'
 import BuyerPipeline from './pages/BuyerPipeline'
 import BuyerDetail from './pages/BuyerDetail'
+import CostSheets from './pages/CostSheets'
+import CostSheetDetail from './pages/CostSheetDetail'
+import Quotations from './pages/Quotations'
+import QuotationDetail from './pages/QuotationDetail'
+import Orders from './pages/Orders'
+import OrderDetail from './pages/OrderDetail'
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
@@ -36,6 +42,13 @@ export default function App() {
         <Route path="buyers" element={<Buyers />} />
         <Route path="buyers/pipeline" element={<BuyerPipeline />} />
         <Route path="buyers/:id" element={<BuyerDetail />} />
+        <Route path="costing" element={<CostSheets />} />
+        <Route path="costing/:id" element={<CostSheetDetail />} />
+        <Route path="quotations" element={<Quotations />} />
+        <Route path="quotations/new" element={<QuotationDetail key="new" />} />
+        <Route path="quotations/:id" element={<QuotationDetail />} />
+        <Route path="orders" element={<Orders />} />
+        <Route path="orders/:id" element={<OrderDetail />} />
         <Route path="companies" element={<Companies />} />
         <Route path="employees" element={<Employees />} />
         <Route path="customers" element={<Customers />} />

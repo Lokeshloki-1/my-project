@@ -12,6 +12,7 @@ from apps.buyers.views import (
     CreditCheckViewSet,
 )
 from apps.billing.views import InvoiceViewSet, PaymentViewSet, RazorpayWebhookView
+from apps.merchandising.views import CostSheetViewSet, OrderConfirmationViewSet, QuotationViewSet
 from apps.companies.views import CompanyViewSet
 from apps.ddp.views import ShipmentViewSet
 from apps.employees.views import DepartmentViewSet, EmployeeViewSet
@@ -36,6 +37,9 @@ router.register("buyers", BuyerViewSet)
 router.register("buyer-contacts", BuyerContactViewSet)
 router.register("buyer-requirements", BuyerRequirementViewSet)
 router.register("credit-checks", CreditCheckViewSet)
+router.register("cost-sheets", CostSheetViewSet)
+router.register("quotations", QuotationViewSet)
+router.register("order-confirmations", OrderConfirmationViewSet)
 
 def health(request):
     """For uptime monitors and Docker: 200 when the app and database are working."""

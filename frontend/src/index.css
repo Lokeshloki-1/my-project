@@ -292,3 +292,64 @@ td.wrap { white-space: normal; min-width: 200px; }
   .tab-panel { padding: 14px; }
   .notice { flex-wrap: wrap; }
 }
+
+/* Costing, quotations, orders */
+.title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.title-row .badge { font-size: 12px; font-weight: 500; }
+.cap { text-transform: capitalize; }
+.warn-text { color: #b45309; }
+[class*='badge-cs-'], [class*='badge-qt-'], [class*='badge-oc-'] { text-transform: none; }
+.badge-cs-draft, .badge-qt-draft, .badge-oc-draft { background: #e5e7eb; color: #374151; }
+.badge-cs-approved, .badge-qt-accepted, .badge-oc-confirmed { background: #dcfce7; color: #166534; }
+.badge-qt-sent { background: #dbeafe; color: #1e40af; }
+.badge-qt-rejected, .badge-qt-cancelled, .badge-oc-cancelled { background: #fee2e2; color: #991b1b; }
+td .badge + .badge { margin-left: 4px; }
+
+.cost-layout, .order-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+.cost-summary, .order-layout aside { position: sticky; top: 16px; }
+.form-grid.tight { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+table.cost-lines th, table.cost-lines td { padding: 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.cost-lines td small { display: block; margin-top: 3px; font-size: 11px; text-align: right; }
+table.cost-lines input, table.cost-lines select { min-width: 0; }
+table.cost-lines td:nth-child(2) input { min-width: 180px; }
+input.num { text-align: right; }
+.w-sm { width: 76px; }
+.w-md { width: 110px; }
+dl.summary { margin: 12px 0 0; }
+dl.summary > div { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; font-variant-numeric: tabular-nums; }
+dl.summary dt { color: var(--muted); display: flex; align-items: center; gap: 6px; }
+dl.summary dd { margin: 0; }
+dl.summary .sub { border-top: 1px solid var(--line); font-weight: 600; }
+dl.summary .sub dt { color: var(--text); }
+.fob { margin-top: 12px; padding: 14px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 8%, var(--panel)); display: flex; flex-direction: column; gap: 2px; }
+.fob span { font-size: 12px; color: var(--muted); }
+.fob strong { font-size: 26px; color: var(--accent); font-variant-numeric: tabular-nums; }
+dl.facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 0; }
+dl.facts dt { font-size: 12px; color: var(--muted); }
+dl.facts dd { margin: 2px 0 0; }
+
+.credit-panel.good { border-top: 3px solid var(--pos); }
+.credit-panel.bad { border-top: 3px solid var(--neg); }
+.credit-bar { display: flex; height: 12px; border-radius: 999px; background: var(--hover); overflow: hidden; margin: 4px 0 6px; }
+.credit-bar .used { background: #94a3b8; }
+.credit-bar .mine { background: var(--accent); }
+.credit-panel.bad .credit-bar .mine { background: var(--neg); }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+.sw.used { background: #94a3b8; }
+.sw.mine { background: var(--accent); }
+
+@media (max-width: 1100px) {
+  .cost-layout, .order-layout { grid-template-columns: minmax(0, 1fr); }
+  .cost-summary, .order-layout aside { position: static; }
+}
+@media (max-width: 900px) {
+  dl.facts { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Long menus scroll inside the sidebar instead of running off the screen. */
+.sidebar nav { overflow-y: auto; min-height: 0; scrollbar-width: thin; }
+.sidebar-user { flex-shrink: 0; }
+table.cost-lines td:first-child select { min-width: 150px; }
+table.cost-lines td:nth-child(3) input { min-width: 180px; }
+dl.summary dd { white-space: nowrap; text-align: right; }
+@media (max-width: 900px) { .sidebar nav { overflow: visible; } }

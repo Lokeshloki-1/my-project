@@ -22,6 +22,8 @@ from apps.buyers import services as buyer_services
 from apps.buyers.models import Buyer, BuyerContact, BuyerEnquiry, BuyerRequirement
 from apps.companies.models import Company
 from apps.ddp.models import Shipment
+from apps.merchandising import services as merch
+from apps.merchandising.models import CostSheet, CostSheetLine, OrderConfirmation, Quotation, QuotationLine
 from apps.employees.models import Department, Employee
 from apps.inventory.models import StockMovement, Warehouse
 from apps.inventory.services import issue_for_order, move_stock
@@ -126,6 +128,7 @@ class Command(BaseCommand):
                 )
 
         self._seed_buyers(companies[0], today)
+        self._seed_merchandising(today)
         self.stdout.write(self.style.SUCCESS("Demo data created. Login: admin / admin12345"))
 
     def _seed_buyers(self, company, today):
@@ -181,6 +184,64 @@ class Command(BaseCommand):
             )
             if stage == "approved":
                 buyer_services.approve_buyer(buyer, manager)
+
+    def _seed_merchandising(self, today):
+        """Cost sheets, quotations and an order for the approved demo buyer."""
+        sales = User.objects.get(username="sales")
+        manager = User.objects.get(username="manager")
+        buyer = Buyer.objects.get(legal_name="Nordic Threads AB")
+        styles = [
+            ("NT-101", "Kids organic crew-neck tee", "kidswear", 180, [
+                ("fabric", "180 GSM organic cotton jersey", "kg", "0.18", "6.20", "8"),
+                ("trims", "Main label, care label, hang tag", "set", "1", "0.08", "3"),
+                ("print_embroidery", "Water-based chest print", "pc", "1", "0.15", "2"),
+                ("cmt", "Cut, make, trim", "pc", "1", "0.55", "0"),
+                ("testing", "GOTS / OEKO-TEX testing", "pc", "1", "0.03", "0"),
+                ("packing", "Polybag + carton", "pc", "1", "0.06", "0"),
+            ]),
+            ("NT-205", "Kids hooded sweatshirt", "kidswear", 280, [
+                ("fabric", "280 GSM organic loopback fleece", "kg", "0.42", "7.10", "10"),
+                ("trims", "Drawcord, eyelets, labels", "set", "1", "0.22", "3"),
+                ("cmt", "Cut, make, trim", "pc", "1", "1.40", "0"),
+                ("washing", "Enzyme wash", "pc", "1", "0.18", "0"),
+                ("packing", "Polybag + carton", "pc", "1", "0.09", "0"),
+            ]),
+        ]
+        sheets = []
+        for style_no, name, category, gsm, lines in styles:
+            sheet = CostSheet.objects.create(
+                company=buyer.company, buyer=buyer, style_no=style_no, style_name=name, category=category, gsm=gsm,
+                fabric_composition="100% organic cotton", size_range="2-12Y", quantity=6000, currency="USD",
+                overhead_pct=Decimal("8"), margin_pct=Decimal("15"), commission_pct=Decimal("3"), created_by=sales,
+            )
+            for cat, desc, unit, cons, rate, waste in lines:
+                CostSheetLine.objects.create(cost_sheet=sheet, category=cat, description=desc, unit=unit,
+                                             consumption=Decimal(cons), rate=Decimal(rate), wastage_pct=Decimal(waste))
+            sheet.recalculate()
+            merch.log("cost_sheet", sheet, "created", sales)
+            merch.approve_cost_sheet(sheet, manager)
+            sheets.append(sheet)
+
+        def quote(lines, days_ago):
+            q = Quotation.objects.create(
+                company=buyer.company, buyer=buyer, quote_date=today - timedelta(days=days_ago),
+                valid_until=today + timedelta(days=30 - days_ago), currency="USD", incoterm="FOB",
+                delivery_port="Chennai", payment_terms="lc_sight", delivery_date=today + timedelta(days=75), created_by=sales,
+            )
+            for sheet, qty in lines:
+                QuotationLine.objects.create(quotation=q, cost_sheet=sheet, style_no=sheet.style_no,
+                                             description=sheet.style_name, quantity=qty, unit_price=sheet.fob_price)
+            q.recalculate()
+            merch.log("quotation", q, "created", sales)
+            return q
+
+        accepted = quote([(sheets[0], 6000), (sheets[1], 3000)], days_ago=10)
+        merch.send_quotation(accepted, sales)
+        merch.accept_quotation(accepted, sales, "Accepted by email from Anna Berg")
+        order, _ = merch.create_order(accepted, sales)
+        OrderConfirmation.objects.filter(pk=order.pk).update(buyer_po_no="NT-PO-2026-118", po_date=today - timedelta(days=3))
+        merch.send_quotation(quote([(sheets[1], 2500)], days_ago=2), sales)
+        quote([(sheets[0], 4000)], days_ago=0)
 
     def _issue_with_restock(self, order):
         """Take stock for the order; if a product is short, record a restock receipt first (like a purchase)."""

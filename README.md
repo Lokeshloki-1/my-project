@@ -22,6 +22,16 @@ stock and warehouses, invoices and payments, monthly sales reports and **DDP (De
 - **Approval** by a manager or admin creates the **customer**, so only approved buyers can get orders and invoices.
 - **Buyer pipeline** board and a dashboard card showing how many buyers are at each step.
 
+**Costing → Quotation → Order confirmation** (textile flow, step 2 — [API reference](docs/api/costing-quotation-order.md))
+- **Cost sheets** per style: fabric (consumption × rate + wastage), trims, print, washing, CMT, testing, packing,
+  freight, then overhead %, margin % and agent commission % → **FOB price per piece**, updated live as you type.
+  A manager approves the cost sheet; *Copy* makes a revised costing.
+- **Quotations** for approved buyers only, built from approved cost sheets. Price defaults to the FOB price and
+  is flagged when it is below cost. Draft → sent → accepted / rejected, with validity dates.
+- **Order confirmations** from accepted quotations: enter the buyer's PO number, shipment date and final
+  quantities, then confirm. The **credit limit** from the buyer's credit check is checked; going over it needs a
+  manager and a recorded reason.
+
 **ERP**
 - **Companies** – run more than one business entity (e.g. a manufacturing company and an export company).
 - **Employees & departments** – employee code, designation, salary, monthly sales target, status.
@@ -83,9 +93,9 @@ Only orders that are *confirmed*, *invoiced* or *paid* count as sales.
 **Roles**
 | Role | Can do |
 |------|--------|
-| `admin`, `manager` | everything, including approving or rejecting buyers, editing companies, employees, products, warehouses, moving stock and deleting payments |
+| `admin`, `manager` | everything, including approving buyers and cost sheets, confirming orders over the credit limit, editing companies, employees, products, warehouses, moving stock and deleting payments |
 | `accountant` | record buyer credit checks, create invoices, record payments, cancel invoices; view everything |
-| `sales` | create enquiries and buyers and submit them for credit check, create customers, orders and shipments; view invoices, payments and stock |
+| `sales` | create enquiries and buyers and submit them for credit check, cost sheets, quotations and orders within the credit limit, create customers, orders and shipments; view invoices, payments and stock |
 
 ## Project structure
 
@@ -96,6 +106,7 @@ backend/
     accounts/       User model (with role), login API, permissions
     companies/      Company model + seed_demo command
     employees/      Department, Employee
+    merchandising/  Cost sheets, quotations, order confirmations, credit-limit check (services.py)
     buyers/         Buyer onboarding: enquiry, buyer, contacts, requirements, credit checks, approval (services.py)
     sales/          Customer, Product, SalesOrder, SalesOrderItem
     billing/        Invoice, Payment, invoice PDF (pdf.py), Razorpay UPI QR (razorpay.py, upi.py)
