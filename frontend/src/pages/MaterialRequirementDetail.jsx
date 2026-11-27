@@ -63,6 +63,7 @@ export default function MaterialRequirementDetail() {
           {can('reopen') && <button className="secondary" onClick={() => act('reopen')} disabled={busy}>Reopen</button>}
           {can('approve') && <button className="approve" onClick={approve} disabled={busy}>Save & approve</button>}
           {can('create_rfq') && <button className="secondary" disabled={!pick.length} onClick={() => navigate(`/rfqs/new?mr=${mr.id}&lines=${pick.join(',')}`)}>Create RFQ{selected.length ? ` (${selected.length})` : ''}</button>}
+          {mr.status === 'approved' && mr.order && <Link className="button secondary" to={`/allocation/${mr.id}`}>Stock allocation</Link>}
           {can('create_po') && <button disabled={!pick.length} onClick={() => navigate(`/purchase-orders/new?mr=${mr.id}&lines=${pick.join(',')}`)}>Create PO{selected.length ? ` (${selected.length})` : ''}</button>}
         </div>
       </div>

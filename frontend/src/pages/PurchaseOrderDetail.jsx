@@ -93,6 +93,7 @@ export default function PurchaseOrderDetail() {
           {can('cancel') && <button className="secondary" onClick={() => setDialog('cancel')} disabled={busy}>Cancel PO</button>}
           {can('approve') && <button className="approve" onClick={approve} disabled={busy}>Save & approve</button>}
           {can('send') && <button onClick={() => setDialog('send')} disabled={busy}>Mark sent to supplier</button>}
+          {po?.status === 'sent' && po.lines.some((l) => Number(l.received_qty) < Number(l.quantity)) && <Link className="button" to={`/receipts/new?po=${po.id}`}>Receive goods</Link>}
         </div>
       </div>
       <div className="no-print">
@@ -127,7 +128,7 @@ export default function PurchaseOrderDetail() {
             <h2>Items</h2>
             <div className="table-wrap">
               <table className="cost-lines">
-                <thead><tr><th>Type</th><th>Material</th><th>Colour</th><th className="num">Quantity</th><th>Unit</th><th className="num">Price / unit</th><th className="num">Amount</th><th className="no-print" /></tr></thead>
+                <thead><tr><th>Type</th><th>Material</th><th>Colour</th><th className="num">Quantity</th><th>Unit</th><th className="num">Price / unit</th><th className="num">Amount</th><th className="no-print">{po?.status === 'sent' ? 'Received' : ''}</th></tr></thead>
                 <tbody>
                   {form.lines.length === 0 && <tr><td colSpan={8} className="muted center">No items yet.</td></tr>}
                   {form.lines.map((l, i) => {
@@ -144,7 +145,8 @@ export default function PurchaseOrderDetail() {
                         <td><input className="w-xs" value={l.unit} onChange={(e) => setLine(i, { unit: e.target.value })} aria-label="Unit" /></td>
                         <td><input className="num w-md" type="number" min="0" step="0.01" value={l.unit_price} onChange={(e) => setLine(i, { unit_price: e.target.value })} required aria-label="Price" /></td>
                         <td className="num">{num((Number(l.quantity) || 0) * (Number(l.unit_price) || 0))}</td>
-                        <td className="no-print">{editable && <button type="button" className="link" onClick={() => set('lines', form.lines.filter((_, j) => j !== i))} aria-label="Remove">✕</button>}</td>
+                        <td className="no-print">{editable ? <button type="button" className="link" onClick={() => set('lines', form.lines.filter((_, j) => j !== i))} aria-label="Remove">✕</button>
+                          : po?.status === 'sent' && <span className={`small ${Number(l.received_qty) >= Number(l.quantity) ? 'pos' : 'muted'}`}>{qty(l.received_qty)}{Number(l.accepted_qty) > 0 && <><br />{qty(l.accepted_qty)} accepted</>}</span>}</td>
                       </tr>
                     )
                   })}

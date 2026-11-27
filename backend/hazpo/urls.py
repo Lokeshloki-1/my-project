@@ -15,6 +15,13 @@ from apps.billing.views import InvoiceViewSet, PaymentViewSet, RazorpayWebhookVi
 from apps.merchandising.views import CostSheetViewSet, OrderConfirmationViewSet, QuotationViewSet
 from apps.development.views import SampleViewSet, TechPackViewSet
 from apps.procurement.views import MaterialRequirementViewSet, PurchaseOrderViewSet, RFQViewSet, SupplierViewSet
+from apps.stores.views import (
+    AllocationViewSet,
+    GoodsReceiptViewSet,
+    MaterialMovementViewSet,
+    MaterialStockViewSet,
+    MaterialViewSet,
+)
 from apps.companies.views import CompanyViewSet
 from apps.ddp.views import ShipmentViewSet
 from apps.employees.views import DepartmentViewSet, EmployeeViewSet
@@ -48,6 +55,11 @@ router.register("suppliers", SupplierViewSet)
 router.register("material-requirements", MaterialRequirementViewSet)
 router.register("rfqs", RFQViewSet)
 router.register("purchase-orders", PurchaseOrderViewSet)
+router.register("materials", MaterialViewSet)
+router.register("material-stock", MaterialStockViewSet)
+router.register("material-movements", MaterialMovementViewSet)
+router.register("goods-receipts", GoodsReceiptViewSet)
+router.register("material-allocations", AllocationViewSet)
 
 def health(request):
     """For uptime monitors and Docker: 200 when the app and database are working."""

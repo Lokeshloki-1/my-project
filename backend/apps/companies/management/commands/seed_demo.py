@@ -26,6 +26,8 @@ from apps.development import services as dev
 from apps.development.models import BOMItem, Measurement, Sample, TechPack
 from apps.merchandising import services as merch
 from apps.procurement import services as proc
+from apps.stores import services as stores
+from apps.stores.models import GoodsReceipt, GoodsReceiptLine
 from apps.procurement.models import PurchaseOrder, PurchaseOrderLine, RFQ, RFQLine, Supplier
 from apps.merchandising.models import CostSheet, CostSheetLine, OrderConfirmation, Quotation, QuotationLine
 from apps.employees.models import Department, Employee
@@ -135,6 +137,7 @@ class Command(BaseCommand):
         self._seed_merchandising(today)
         self._seed_development(today)
         self._seed_procurement(today)
+        self._seed_stores(today)
         self.stdout.write(self.style.SUCCESS("Demo data created. Login: admin / admin12345"))
 
     def _seed_buyers(self, company, today):
@@ -374,6 +377,31 @@ class Command(BaseCommand):
                                              unit=line.unit, quantity=line.required_qty, unit_price=Decimal(price), position=i)
         po2.recalculate()
         proc.log("po", po2, "created", sales)
+
+    def _seed_stores(self, today):
+        """A raw-material store, the fabric PO received and inspected, and stock allocated to the order."""
+        sales = User.objects.get(username="sales")
+        manager = User.objects.get(username="manager")
+        po = PurchaseOrder.objects.filter(status=PurchaseOrder.Status.SENT, rfq__isnull=False).order_by("id").first()
+        company = po.company
+        store, _ = Warehouse.objects.get_or_create(company=company, code="RMS",
+                                                   defaults={"name": "Raw Material Store", "city": company.city or "Chennai"})
+        grn = GoodsReceipt.objects.create(company=company, purchase_order=po, supplier=po.supplier, warehouse=store,
+                                          received_on=today - timedelta(days=1), challan_no="DC-4471", invoice_no="EOM/26-27/918",
+                                          vehicle_no="TN 33 AB 4521", created_by=sales)
+        for i, line in enumerate(po.lines.all()):
+            GoodsReceiptLine.objects.create(receipt=grn, po_line=line, position=i, received_qty=line.quantity,
+                                            lot_no=f"DL-{2600 + i}", rolls=int(line.quantity // 25),
+                                            material=stores.material_for(company, line.category, line.description, line.colour, line.unit))
+        stores.log("grn", grn, "created", sales, f"Against {po.po_no}")
+        stores.submit_grn(grn, sales)
+        results = []
+        for line in grn.lines.all():
+            rejected = Decimal("34") if line.position == 0 else Decimal("0")
+            results.append({"line": line.id, "accepted_qty": line.received_qty - rejected, "rejected_qty": rejected,
+                            "remarks": "Shade variation in 1 roll vs approved lab dip" if rejected else ""})
+        stores.inspect_grn(grn, manager, results, "4-point inspection on 10% of rolls; GSM and shade checked")
+        stores.auto_allocate(po.requirement, sales, store)
 
     def _issue_with_restock(self, order):
         """Take stock for the order; if a product is short, record a restock receipt first (like a purchase)."""

@@ -159,7 +159,7 @@ class PurchaseOrderViewSet(_DocViewSet, mixins.ListModelMixin, mixins.RetrieveMo
                            mixins.UpdateModelMixin, mixins.DestroyModelMixin):
     queryset = PurchaseOrder.objects.select_related("supplier", "requirement", "rfq", "approved_by").prefetch_related(
         Prefetch("lines", queryset=PurchaseOrderLine.objects.select_related("requirement_line__requirement").prefetch_related(
-            "requirement_line__po_lines__order"))
+            "requirement_line__po_lines__order", "grn_lines__receipt"))
     )
     list_serializer = PurchaseOrderListSerializer
     detail_serializer = PurchaseOrderSerializer

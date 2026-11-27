@@ -51,6 +51,16 @@ stock and warehouses, invoices and payments, monthly sales reports and **DDP (De
 - **Supplier POs**: manager approval, over-ordering warning, print view for the supplier, sent / cancelled.
 - **Suppliers** with categories, payment terms and lead time.
 
+**Inventory & warehouse: goods receipt → inspection → stock allocation** (textile flow, step 5 — [API reference](docs/api/inventory-warehouse.md))
+- **Goods receipts** against sent supplier POs: challan, invoice, vehicle, lot / dye lot and rolls; up to 10% over
+  the PO quantity. Nothing goes into stock until it is inspected.
+- **Inspection** per line: rejected quantity with findings; only accepted material goes into stock at the PO price,
+  rejections are listed for return to the supplier. POs show received and accepted quantities.
+- **Material stock** per store: on hand, allocated, free, average cost and value; a permanent movement ledger;
+  manager stock-count adjustments.
+- **Stock allocation** to confirmed orders from their material requirement (by hand or *Allocate all free stock*),
+  then **issue to production** or release.
+
 **ERP**
 - **Companies** – run more than one business entity (e.g. a manufacturing company and an export company).
 - **Employees & departments** – employee code, designation, salary, monthly sales target, status.
@@ -125,6 +135,7 @@ backend/
     accounts/       User model (with role), login API, permissions
     companies/      Company model + seed_demo command
     employees/      Department, Employee
+    stores/         Raw materials: goods receipts, inspection, material stock ledger, allocation (services.py)
     procurement/    Suppliers, material requirements, RFQs with quote comparison, supplier POs (services.py)
     development/    Tech packs (measurements, BOM, revisions), samples, measurement check (services.py)
     merchandising/  Cost sheets, quotations, order confirmations, credit-limit check (services.py)

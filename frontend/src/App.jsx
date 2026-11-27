@@ -36,6 +36,10 @@ import RFQs from './pages/RFQs'
 import RFQDetail from './pages/RFQDetail'
 import PurchaseOrders from './pages/PurchaseOrders'
 import PurchaseOrderDetail from './pages/PurchaseOrderDetail'
+import GoodsReceipts from './pages/GoodsReceipts'
+import GoodsReceiptDetail from './pages/GoodsReceiptDetail'
+import MaterialStock from './pages/MaterialStock'
+import Allocation from './pages/Allocation'
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
@@ -73,6 +77,12 @@ export default function App() {
         <Route path="purchase-orders" element={<PurchaseOrders />} />
         <Route path="purchase-orders/new" element={<PurchaseOrderDetail key="new" />} />
         <Route path="purchase-orders/:id" element={<PurchaseOrderDetail />} />
+        <Route path="receipts" element={<GoodsReceipts />} />
+        <Route path="receipts/new" element={<GoodsReceiptDetail key="new" />} />
+        <Route path="receipts/:id" element={<GoodsReceiptDetail />} />
+        <Route path="material-stock" element={<MaterialStock />} />
+        <Route path="allocation" element={<Allocation />} />
+        <Route path="allocation/:id" element={<Allocation />} />
         <Route path="companies" element={<Companies />} />
         <Route path="employees" element={<Employees />} />
         <Route path="customers" element={<Customers />} />

@@ -314,11 +314,20 @@ class POLineSerializer(_DocLineSerializer):
     unit_price = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=ZERO)
     required_qty = serializers.DecimalField(source="requirement_line.required_qty", max_digits=14, decimal_places=2, read_only=True, default=None)
     ordered_total = serializers.SerializerMethodField()
+    received_qty = serializers.SerializerMethodField()
+    accepted_qty = serializers.SerializerMethodField()
 
     class Meta:
         model = PurchaseOrderLine
         fields = ["id", "requirement_line", "mr_no", "category", "description", "colour", "unit", "quantity",
-                  "unit_price", "amount", "required_qty", "ordered_total"]
+                  "unit_price", "amount", "required_qty", "ordered_total", "received_qty", "accepted_qty"]
+
+    def get_received_qty(self, obj):
+        """Quantity on submitted goods receipts (stores app)."""
+        return sum((g.received_qty for g in obj.grn_lines.all() if g.receipt.status != "draft"), ZERO) if obj.pk else ZERO
+
+    def get_accepted_qty(self, obj):
+        return sum((g.accepted_qty for g in obj.grn_lines.all() if g.receipt.status == "inspected"), ZERO) if obj.pk else ZERO
         read_only_fields = ["amount"]
 
     def get_ordered_total(self, obj):
