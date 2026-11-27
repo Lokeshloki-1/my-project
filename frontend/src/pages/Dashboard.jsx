@@ -31,6 +31,9 @@ export default function Dashboard() {
         <Kpi label="Money owed to us" value={money(stats.outstanding_receivables)}
           sub={stats.overdue_invoices ? `${money(stats.overdue_receivables)} overdue · ${stats.overdue_invoices} invoices` : 'Nothing overdue'}
           tone={stats.overdue_invoices ? 'neg' : 'pos'} />
+        <Kpi label="Stock value" value={money(stats.stock_value)}
+          sub={stats.low_stock_products ? `${stats.low_stock_products} ${stats.low_stock_products === 1 ? 'product' : 'products'} low on stock` : 'Stock levels OK'}
+          tone={stats.low_stock_products ? 'neg' : 'pos'} />
         <Kpi label="Open DDP shipments" value={stats.open_ddp_shipments} />
       </div>
 

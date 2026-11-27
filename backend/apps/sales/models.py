@@ -31,6 +31,10 @@ class Product(models.Model):
     hs_code = models.CharField("HS code", max_length=20, blank=True, help_text="Customs tariff code, used for DDP shipments")
     unit_price = models.DecimalField(max_digits=12, decimal_places=2)
     tax_rate = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("18.00"), help_text="Percent, e.g. 18 for 18% GST")
+    cost_price = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text="Purchase cost, used for stock value")
+    reorder_level = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0, help_text="Warn when total stock falls to or below this"
+    )
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -39,6 +43,8 @@ class Product(models.Model):
             models.UniqueConstraint(fields=["company", "sku"], name="uniq_sku_per_company"),
             models.CheckConstraint(condition=Q(unit_price__gte=0), name="product_price_non_negative"),
             models.CheckConstraint(condition=Q(tax_rate__gte=0) & Q(tax_rate__lte=100), name="product_tax_rate_0_100"),
+            models.CheckConstraint(condition=Q(cost_price__gte=0), name="product_cost_non_negative"),
+            models.CheckConstraint(condition=Q(reorder_level__gte=0), name="product_reorder_non_negative"),
         ]
 
     def __str__(self):
@@ -60,6 +66,10 @@ class SalesOrder(models.Model):
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name="orders")
     salesperson = models.ForeignKey(
         "employees.Employee", on_delete=models.PROTECT, null=True, blank=True, related_name="sales_orders"
+    )
+    warehouse = models.ForeignKey(
+        "inventory.Warehouse", on_delete=models.PROTECT, null=True, blank=True, related_name="sales_orders",
+        help_text="Stock is taken from here when the order is confirmed. Leave empty for services.",
     )
     order_no = models.CharField(max_length=30, unique=True, null=True, blank=True, editable=False)
     order_date = models.DateField(db_index=True)

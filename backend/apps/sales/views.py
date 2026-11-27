@@ -1,3 +1,5 @@
+from django.db.models import DecimalField, Sum, Value
+from django.db.models.functions import Coalesce
 from rest_framework import viewsets
 from rest_framework.exceptions import ValidationError
 
@@ -15,7 +17,9 @@ class CustomerViewSet(viewsets.ModelViewSet):
 
 
 class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.all()
+    queryset = Product.objects.annotate(
+        stock_on_hand=Coalesce(Sum("stock_levels__quantity"), Value(0), output_field=DecimalField(max_digits=14, decimal_places=2))
+    )
     serializer_class = ProductSerializer
     permission_classes = [IsManagerOrReadOnly]
     filterset_fields = ["company", "is_active"]
@@ -25,7 +29,7 @@ class ProductViewSet(viewsets.ModelViewSet):
 class SalesOrderViewSet(viewsets.ModelViewSet):
     queryset = SalesOrder.objects.select_related("company", "customer", "salesperson").prefetch_related(
         "items__product"
-    ).select_related("invoice")
+    ).select_related("invoice", "warehouse")
     serializer_class = SalesOrderSerializer
     filterset_fields = {
         "company": ["exact"],

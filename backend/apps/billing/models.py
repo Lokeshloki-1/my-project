@@ -8,6 +8,7 @@ the invoice status (and the sales order status) follow automatically.
 
 from decimal import Decimal
 
+from django.conf import settings
 from django.db import models
 from django.db.models import Q, Sum
 
@@ -92,6 +93,9 @@ class Payment(models.Model):
     method = models.CharField(max_length=20, choices=Method.choices, default=Method.BANK_TRANSFER)
     reference = models.CharField(max_length=100, blank=True, help_text="UTR / cheque no. / transaction id")
     notes = models.TextField(blank=True)
+    # Set for payments that came in through Razorpay. Unique, so the same payment is never recorded twice
+    # even if Razorpay sends the webhook again or the app checks the QR code at the same moment.
+    gateway_payment_id = models.CharField(max_length=50, unique=True, null=True, blank=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -102,3 +106,31 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"{self.amount} on {self.payment_date} for {self.invoice}"
+
+
+class UpiQrCode(models.Model):
+    """A one-time Razorpay UPI QR code shown to a customer to pay an invoice's balance."""
+
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Waiting for payment"
+        PAID = "paid", "Paid"
+        CLOSED = "closed", "Closed"
+        NEEDS_REVIEW = "needs_review", "Paid, needs review"
+
+    invoice = models.ForeignKey(Invoice, on_delete=models.PROTECT, related_name="upi_qr_codes")
+    razorpay_qr_id = models.CharField(max_length=50, unique=True)
+    image_url = models.URLField()
+    amount = models.DecimalField(max_digits=14, decimal_places=2)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE, db_index=True)
+    close_by = models.DateTimeField()
+    review_note = models.TextField(blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [models.CheckConstraint(condition=Q(amount__gt=0), name="upi_qr_amount_positive")]
+
+    def __str__(self):
+        return f"{self.razorpay_qr_id} for {self.invoice}"

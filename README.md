@@ -1,7 +1,7 @@
 # Hazpo ERP
 
 A small ERP for managing companies, employees, customers, products, sales orders,
-invoices and payments, monthly sales reports and **DDP (Delivered Duty Paid)** export shipments.
+stock and warehouses, invoices and payments, monthly sales reports and **DDP (Delivered Duty Paid)** export shipments.
 
 | Layer    | Technology |
 |----------|------------|
@@ -18,6 +18,22 @@ invoices and payments, monthly sales reports and **DDP (Delivered Duty Paid)** e
 - **Sales orders** – multiple line items; subtotal, GST and total are always calculated by the server.
   Status flow: draft → confirmed → invoiced → paid (or cancelled). Only drafts can be deleted.
 
+**Stock & inventory**
+- **Warehouses** per company (e.g. a main warehouse and a depot).
+- **Stock page**: stock on hand per product per warehouse, the total across warehouses, cost, stock value,
+  and a **Low** flag when a product's total stock is at or below its **reorder level** (set on the product).
+- **Receive** (goods in from a supplier, with GRN / bill number), **Issue** (goods out that are not a sale),
+  **Adjust** (after a stock count, with a reason; use a minus number to reduce) and **Transfer** between warehouses.
+- **Sales orders take stock automatically**: choose a "ship from" warehouse on the order. When the order is
+  confirmed the stock is taken; if there isn't enough, the order is refused with a clear message. Cancelling the
+  order (or its invoice), or moving it back to draft, puts the stock back. Changing the items or warehouse of a
+  confirmed order re-balances the stock. Orders with no warehouse don't touch stock (useful for services).
+- **Stock movements**: a permanent record of every change (who, when, why, balance after). It is never edited
+  or deleted — mistakes are corrected with an adjustment.
+- Stock can never go below zero: the app checks it, and PostgreSQL enforces it too. Rows are locked while
+  stock changes, so two people selling the last item at the same moment can't both succeed.
+- The dashboard shows total stock value and how many products are low.
+
 **Invoices & payments**
 - Create an invoice from a **confirmed** sales order (button on the order). The invoice copies the order's
   amounts, the order becomes *invoiced* and is then **locked** against edits.
@@ -28,6 +44,10 @@ invoices and payments, monthly sales reports and **DDP (Delivered Duty Paid)** e
 - Mistakes: payments can't be edited; an admin/manager deletes the payment and records it again.
   An invoice with no payments can be cancelled, which also cancels its order. Invoices are never deleted.
 - The dashboard shows money owed to you and how much of it is overdue.
+- **Collect by UPI QR (Razorpay)**: on an unpaid invoice, click *Collect by UPI QR*. A one-time QR for the balance
+  appears; the customer scans it with PhonePe, Google Pay, Paytm, BHIM or any UPI app. When Razorpay confirms the
+  payment it is recorded automatically (with the UPI reference / UTR) and the invoice turns *Paid*. See
+  [Razorpay UPI QR setup](#razorpay-upi-qr-setup).
 
 **DDP shipments**
 Under DDP your company pays every cost until the goods reach the customer. For each shipment Hazpo calculates:
@@ -52,9 +72,9 @@ Only orders that are *confirmed*, *invoiced* or *paid* count as sales.
 **Roles**
 | Role | Can do |
 |------|--------|
-| `admin`, `manager` | everything, including editing companies, employees, products and deleting payments |
+| `admin`, `manager` | everything, including editing companies, employees, products, warehouses, moving stock and deleting payments |
 | `accountant` | create invoices, record payments, cancel invoices; view everything |
-| `sales` | create customers, orders and shipments; view invoices and payments |
+| `sales` | create customers, orders and shipments; view invoices, payments and stock |
 
 ## Project structure
 
@@ -66,7 +86,8 @@ backend/
     companies/      Company model + seed_demo command
     employees/      Department, Employee
     sales/          Customer, Product, SalesOrder, SalesOrderItem
-    billing/        Invoice, Payment, invoice PDF (pdf.py)
+    billing/        Invoice, Payment, invoice PDF (pdf.py), Razorpay UPI QR (razorpay.py, upi.py)
+    inventory/      Warehouse, StockLevel, StockMovement; services.py is the only code that changes stock
     ddp/            Shipment (DDP landed cost)
     reports/        Dashboard & sales report APIs
 frontend/
@@ -117,6 +138,35 @@ npm run dev
 ```
 Vite forwards every `/api/...` request to Django on port 8000, so no extra setup is needed.
 
+### Razorpay UPI QR setup
+
+Optional — without keys the *Collect by UPI QR* button is simply hidden.
+
+1. In the [Razorpay Dashboard](https://dashboard.razorpay.com) go to **Account & Settings → API Keys** and generate keys.
+   Use **Test Mode** keys (`rzp_test_...`) while developing.
+2. Put them in `backend/.env`:
+   ```
+   RAZORPAY_KEY_ID=rzp_test_xxxxxxxx
+   RAZORPAY_KEY_SECRET=xxxxxxxx
+   RAZORPAY_QR_MINUTES=15        # how long a QR stays payable (Razorpay allows 2–120)
+   ```
+3. Restart Django. The button appears on unpaid invoices.
+
+**How the payment reaches Hazpo** — two ways, both safe to use together (a payment is never recorded twice):
+- *While the QR is on screen* the app asks Razorpay every few seconds whether it was paid. This works on your own
+  computer with no extra setup.
+- *Webhook* (instant, and catches payments after the screen was closed). Needs a public HTTPS address, so set it up
+  on your server: Dashboard → **Account & Settings → Webhooks → Add New Webhook**, URL
+  `https://your-domain/api/razorpay/webhook/`, event **`qr_code.credited`**, and a secret of your choice. Put the same
+  secret in `RAZORPAY_WEBHOOK_SECRET`. Requests without a valid signature are rejected.
+
+**Things to know**
+- Razorpay QR codes created in **Test Mode cannot be scanned** (Razorpay's rule). To try a real payment, use Live Mode
+  keys on a small invoice (e.g. ₹1) and refund it from the Razorpay Dashboard.
+- Each QR is single-use, for the exact balance. Making a new QR closes the previous one, so a customer can't pay twice.
+- If money arrives that can't be applied (e.g. the invoice was paid in cash meanwhile), nothing is recorded and the QR
+  is marked *needs review* — apply or refund it from the Razorpay Dashboard.
+
 ### Run the tests
 ```bash
 cd backend && python manage.py test apps
@@ -138,7 +188,13 @@ All endpoints need `Authorization: Bearer <access token>` except login.
 | `/api/invoices/` | list / create (`{sales_order, payment_terms_days}`) / view / edit due date & notes |
 | `GET  /api/invoices/{id}/pdf/` | invoice PDF download |
 | `POST /api/invoices/{id}/cancel/` | cancel an invoice with no payments |
+| `POST /api/invoices/{id}/upi-qr/` | create a Razorpay UPI QR for the balance; `GET` = latest QR + payment check |
+| `POST /api/razorpay/webhook/` | Razorpay webhook (`qr_code.credited`), verified by `X-Razorpay-Signature` |
 | `/api/payments/` | list / record (`{invoice, amount, payment_date, method, reference}`) / delete |
+| `/api/warehouses/` | CRUD |
+| `GET  /api/stock-levels/` | stock per product per warehouse (`?warehouse=`, `?low_stock=true`, `?hide_empty=true`) |
+| `/api/stock-movements/` | ledger list; `POST` `{movement_type: receipt\|issue\|adjustment, product, warehouse, quantity, reference, note}` |
+| `POST /api/stock-movements/transfer/` | `{product, from_warehouse, to_warehouse, quantity}` |
 | `/api/ddp/shipments/` | CRUD |
 | `POST /api/ddp/shipments/quote/` | landed-cost calculator (saves nothing) |
 | `GET /api/reports/dashboard/` | dashboard numbers |
@@ -148,14 +204,13 @@ All endpoints need `Authorization: Bearer <access token>` except login.
 
 Lists are paginated (25 per page, `?page=2`, `?page_size=100` up to 500).
 
-## Before going to production
+## Running it for real (production)
 
-- Set `DJANGO_DEBUG=false`, a long random `DJANGO_SECRET_KEY`, and real `DJANGO_ALLOWED_HOSTS`.
-- Change or delete the demo `admin` user.
-- Build the frontend with `npm run build` and serve `frontend/dist/`; run Django with gunicorn.
-- Set `VITE_API_URL` if the API is on a different domain, and add that domain to `CORS_ALLOWED_ORIGINS`.
+See **[DEPLOY.md](DEPLOY.md)** — a step-by-step guide to put Hazpo on a server with HTTPS using Docker
+(`docker-compose.prod.yml`), plus daily backups (`scripts/backup.sh`, `scripts/restore.sh`) and a go-live checklist.
 
 ## Ideas for next steps
 
-Credit notes · CGST/SGST vs IGST split by state · payment reminders by email · stock / inventory · purchase orders ·
+Credit notes · CGST/SGST vs IGST split by state · purchase orders and suppliers (feeding stock receipts) ·
+batch / expiry tracking · payment reminders by email · purchase orders ·
 attendance & payroll · export reports to Excel · per-company user access.

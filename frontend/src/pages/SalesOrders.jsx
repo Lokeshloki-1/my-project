@@ -11,7 +11,7 @@ const STATUSES = ['draft', 'confirmed', 'invoiced', 'paid', 'cancelled']
 // Invoiced and paid are set by the billing module, not by hand.
 const EDITABLE_STATUSES = ['draft', 'confirmed', 'cancelled']
 const today = () => new Date().toISOString().slice(0, 10)
-const emptyOrder = () => ({ company: '', customer: '', salesperson: '', order_date: today(), status: 'draft', notes: '', items: [{ product: '', quantity: 1 }] })
+const emptyOrder = () => ({ company: '', customer: '', salesperson: '', warehouse: '', order_date: today(), status: 'draft', notes: '', items: [{ product: '', quantity: 1 }] })
 
 export default function SalesOrders() {
   const [rows, setRows] = useState([])
@@ -47,7 +47,7 @@ export default function SalesOrders() {
           <tbody>
             {rows.length === 0 && <tr><td colSpan={6} className="muted center">No orders.</td></tr>}
             {rows.map((o) => (
-              <tr key={o.id} className="clickable" onClick={() => { setError(''); setForm({ ...o, salesperson: o.salesperson ?? '' }) }}>
+              <tr key={o.id} className="clickable" onClick={() => { setError(''); setForm({ ...o, salesperson: o.salesperson ?? '', warehouse: o.warehouse ?? '' }) }}>
                 <td>{o.order_no}</td><td>{o.order_date}</td><td>{o.customer_name}</td>
                 <td>{o.salesperson_name || '—'}</td><td><StatusBadge value={o.status} /></td>
                 <td className="num">{money(o.total)}</td>
@@ -70,6 +70,9 @@ function OrderForm({ form, setForm, onSaved, error, setError }) {
   const customers = useOptions('/customers/', scope)
   const employees = useOptions('/employees/', scope)
   const products = useOptions('/products/', scope && { ...scope, is_active: true })
+  const warehouses = useOptions('/warehouses/', scope && { ...scope, is_active: true })
+  const stock = useOptions('/stock-levels/', form.warehouse ? { warehouse: form.warehouse } : null)
+  const inStock = Object.fromEntries(stock.map((l) => [String(l.product), Number(l.quantity)]))
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
   const setItem = (i, k, v) => setForm((f) => ({ ...f, items: f.items.map((it, j) => (j === i ? { ...it, [k]: v } : it)) }))
 
@@ -86,6 +89,7 @@ function OrderForm({ form, setForm, onSaved, error, setError }) {
   const buildBody = () => ({
       ...form,
       salesperson: form.salesperson || null,
+      warehouse: form.warehouse || null,
       items: form.items.map(({ product, quantity, unit_price, tax_rate }) => ({ product, quantity, ...(unit_price != null && { unit_price }), ...(tax_rate != null && { tax_rate }) })),
   })
 
@@ -126,7 +130,7 @@ function OrderForm({ form, setForm, onSaved, error, setError }) {
         <fieldset disabled={locked} className="plain">
         <div className="form-grid">
           <label className="field"><span>Company *</span>
-            <select value={form.company} required onChange={(e) => setForm((f) => ({ ...f, company: e.target.value, customer: '', salesperson: '', items: [{ product: '', quantity: 1 }] }))}>
+            <select value={form.company} required onChange={(e) => setForm((f) => ({ ...f, company: e.target.value, customer: '', salesperson: '', warehouse: '', items: [{ product: '', quantity: 1 }] }))}>
               <option value="">— select —</option>
               {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
@@ -141,6 +145,12 @@ function OrderForm({ form, setForm, onSaved, error, setError }) {
             <select value={form.salesperson} onChange={(e) => set('salesperson', e.target.value)}>
               <option value="">— none —</option>
               {employees.map((e) => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+            </select>
+          </label>
+          <label className="field"><span>Ship from warehouse</span>
+            <select value={form.warehouse} onChange={(e) => set('warehouse', e.target.value)}>
+              <option value="">— no stock tracking —</option>
+              {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
             </select>
           </label>
           <label className="field"><span>Order date *</span>
@@ -170,7 +180,14 @@ function OrderForm({ form, setForm, onSaved, error, setError }) {
                       {products.map((pr) => <option key={pr.id} value={pr.id}>{pr.sku} · {pr.name}</option>)}
                     </select>
                   </td>
-                  <td><input type="number" min="0.01" step="0.01" value={it.quantity} required onChange={(e) => setItem(i, 'quantity', e.target.value)} /></td>
+                  <td>
+                    <input type="number" min="0.01" step="0.01" value={it.quantity} required onChange={(e) => setItem(i, 'quantity', e.target.value)} />
+                    {form.warehouse && it.product && !locked && (
+                      <small className={(inStock[String(it.product)] ?? 0) < Number(it.quantity) && form.status !== 'confirmed' ? 'neg' : 'muted'}>
+                        In stock: {(inStock[String(it.product)] ?? 0).toLocaleString('en-IN')}
+                      </small>
+                    )}
+                  </td>
                   <td><input type="number" min="0" step="0.01" value={it.unit_price ?? p?.unit_price ?? ''} onChange={(e) => setItem(i, 'unit_price', e.target.value)} /></td>
                   <td><input type="number" min="0" max="100" step="0.01" value={it.tax_rate ?? p?.tax_rate ?? ''} onChange={(e) => setItem(i, 'tax_rate', e.target.value)} /></td>
                   <td>{form.items.length > 1 && <button type="button" className="link" onClick={() => set('items', form.items.filter((_, j) => j !== i))}>✕</button>}</td>

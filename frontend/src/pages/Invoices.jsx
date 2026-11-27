@@ -4,6 +4,7 @@ import api, { downloadFile, errorMessage } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import Modal from '../components/Modal'
 import StatusBadge from '../components/StatusBadge'
+import UpiQrPanel from '../components/UpiQrPanel'
 import { money } from '../utils/format'
 
 const STATUSES = ['unpaid', 'partially_paid', 'paid', 'cancelled']
@@ -86,6 +87,7 @@ function InvoiceDetail({ id, onClose, onChanged }) {
   const [inv, setInv] = useState(null)
   const [error, setError] = useState('')
   const [pay, setPay] = useState(null)
+  const [showQr, setShowQr] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(() => {
@@ -184,14 +186,19 @@ function InvoiceDetail({ id, onClose, onChanged }) {
         </form>
       )}
 
+      {showQr && (
+        <UpiQrPanel invoiceId={inv.id} onPaid={() => { load(); onChanged() }} onClose={() => { setShowQr(false); load(); onChanged() }} />
+      )}
+
       {error && <div className="error">{error}</div>}
-      {!pay && (
+      {!pay && !showQr && (
         <div className="modal-foot">
           <div>
             {canFinance && inv.status === 'unpaid' && <button type="button" className="danger" disabled={busy} onClick={cancelInvoice}>Cancel invoice</button>}
           </div>
           <div>
             <button type="button" className="secondary" onClick={() => run(() => downloadFile(`/invoices/${inv.id}/pdf/`, `${inv.invoice_no}.pdf`))}>Download PDF</button>
+            {open && inv.upi_qr_enabled && <button type="button" className="secondary" onClick={() => setShowQr(true)}>Collect by UPI QR</button>}
             {canFinance && open && (
               <button type="button" onClick={() => setPay({ amount: inv.balance, payment_date: today(), method: 'bank_transfer', reference: '' })}>Record payment</button>
             )}

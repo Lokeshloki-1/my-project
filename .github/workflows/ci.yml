@@ -69,3 +69,25 @@ jobs:
         run: npm run lint
       - name: Build
         run: npm run build
+
+  production-stack:
+    name: Production Docker stack starts and is healthy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create a throwaway .env.prod (plain HTTP on :80)
+        run: |
+          cp .env.prod.example .env.prod
+          sed -i 's|^SITE_ADDRESS=.*|SITE_ADDRESS=:80|; s|^DJANGO_ALLOWED_HOSTS=.*|DJANGO_ALLOWED_HOSTS=localhost|' .env.prod
+          sed -i "s|^DJANGO_SECRET_KEY=.*|DJANGO_SECRET_KEY=$(openssl rand -hex 32)|; s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 16)|" .env.prod
+      - name: Build and start
+        run: docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build --wait --wait-timeout 180
+      - name: Smoke test through Caddy
+        run: |
+          curl -fsS http://localhost/api/health/
+          curl -fsS -o /dev/null http://localhost/
+          curl -fsS -o /dev/null http://localhost/invoices
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost/api/invoices/)" = "401"
+      - name: Logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.prod.yml --env-file .env.prod logs --tail 100

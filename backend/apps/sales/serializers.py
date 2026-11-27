@@ -3,6 +3,8 @@ from decimal import Decimal
 from django.db import transaction
 from rest_framework import serializers
 
+from apps.inventory.services import STOCK_HOLDING_STATUSES, issue_for_order, return_for_order
+
 from .models import Customer, Product, SalesOrder, SalesOrderItem
 
 
@@ -14,9 +16,20 @@ class CustomerSerializer(serializers.ModelSerializer):
 
 
 class ProductSerializer(serializers.ModelSerializer):
+    # Filled in by ProductViewSet's queryset annotation (total across all warehouses).
+    stock_on_hand = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True, default=0)
+    is_low_stock = serializers.SerializerMethodField()
+
     class Meta:
         model = Product
-        fields = ["id", "company", "sku", "name", "hs_code", "unit_price", "tax_rate", "is_active"]
+        fields = [
+            "id", "company", "sku", "name", "hs_code", "unit_price", "tax_rate", "cost_price",
+            "reorder_level", "stock_on_hand", "is_low_stock", "is_active",
+        ]
+
+    def get_is_low_stock(self, obj):
+        on_hand = getattr(obj, "stock_on_hand", None)
+        return on_hand is not None and obj.reorder_level > 0 and on_hand <= obj.reorder_level
 
 
 class SalesOrderItemSerializer(serializers.ModelSerializer):
@@ -39,12 +52,13 @@ class SalesOrderSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source="company.name", read_only=True)
     invoice_id = serializers.IntegerField(source="invoice.id", read_only=True, default=None)
     invoice_no = serializers.CharField(source="invoice.invoice_no", read_only=True, default=None)
+    warehouse_name = serializers.CharField(source="warehouse.name", read_only=True, default=None)
 
     class Meta:
         model = SalesOrder
         fields = [
             "id", "order_no", "company", "company_name", "customer", "customer_name",
-            "salesperson", "salesperson_name", "order_date", "status", "notes",
+            "salesperson", "salesperson_name", "warehouse", "warehouse_name", "order_date", "status", "notes",
             "items", "subtotal", "tax_amount", "total", "invoice_id", "invoice_no", "created_at", "updated_at",
         ]
         read_only_fields = ["order_no", "subtotal", "tax_amount", "total", "created_at", "updated_at"]
@@ -67,6 +81,9 @@ class SalesOrderSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"customer": "Customer belongs to a different company."})
         if salesperson and salesperson.company_id != company.id:
             raise serializers.ValidationError({"salesperson": "Salesperson belongs to a different company."})
+        warehouse = attrs.get("warehouse", getattr(self.instance, "warehouse", None))
+        if warehouse and warehouse.company_id != company.id:
+            raise serializers.ValidationError({"warehouse": "Warehouse belongs to a different company."})
         items = attrs.get("items")
         if items is not None:
             if not items:
@@ -90,19 +107,44 @@ class SalesOrderSerializer(serializers.ModelSerializer):
         ])
         order.recalculate_totals()
 
+    def _user(self):
+        request = self.context.get("request")
+        return request.user if request else None
+
+    @staticmethod
+    def _stock_snapshot(order):
+        """What this order takes from stock: (warehouse, {product: qty}) or None if it takes nothing."""
+        if order.status not in STOCK_HOLDING_STATUSES or not order.warehouse_id:
+            return None
+        qty = {}
+        for item in order.items.all():
+            qty[item.product_id] = qty.get(item.product_id, 0) + item.quantity
+        return order.warehouse_id, qty
+
     @transaction.atomic
     def create(self, validated_data):
         items = validated_data.pop("items")
         order = SalesOrder.objects.create(**validated_data)
         self._save_items(order, items)
+        if order.status in STOCK_HOLDING_STATUSES:
+            issue_for_order(order, user=self._user())
         return order
 
     @transaction.atomic
     def update(self, instance, validated_data):
+        # Lock the order so two people saving it at once can't double-count stock.
+        instance = SalesOrder.objects.select_for_update().get(pk=instance.pk)
+        before = self._stock_snapshot(instance)
         items = validated_data.pop("items", None)
         for field, value in validated_data.items():
             setattr(instance, field, value)
         instance.save()
         if items is not None:
             self._save_items(instance, items)
+        after = self._stock_snapshot(instance)
+        if before != after:
+            if before is not None:
+                return_for_order(instance, user=self._user())
+            if after is not None:
+                issue_for_order(instance, user=self._user())
         return instance

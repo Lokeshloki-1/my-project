@@ -18,7 +18,8 @@ from apps.billing.models import Invoice
 from apps.companies.models import Company
 from apps.ddp.models import Shipment
 from apps.employees.models import Employee
-from apps.sales.models import SalesOrder
+from apps.inventory.models import StockLevel
+from apps.sales.models import Product, SalesOrder
 
 ZERO = Decimal("0")
 MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -94,6 +95,18 @@ def dashboard(request):
         employees = employees.filter(company_id=company)
         shipments = shipments.filter(company_id=company)
 
+    stock = StockLevel.objects.all()
+    if company:
+        stock = stock.filter(warehouse__company_id=company)
+    stock_value = stock.aggregate(v=Coalesce(Sum(F("quantity") * F("product__cost_price")), ZERO))["v"]
+    # Low stock is judged on total stock across warehouses, compared with the product's reorder level.
+    products = Product.objects.filter(is_active=True, reorder_level__gt=0)
+    if company:
+        products = products.filter(company_id=company)
+    low_stock = products.annotate(
+        on_hand=Coalesce(Sum("stock_levels__quantity"), ZERO)
+    ).filter(on_hand__lte=F("reorder_level")).count()
+
     return Response({
         "month": f"{MONTH_NAMES[today.month - 1]} {today.year}",
         "sales_this_month": totals["this_month"],
@@ -107,6 +120,8 @@ def dashboard(request):
         "outstanding_receivables": receivables["outstanding"],
         "overdue_receivables": receivables["overdue"],
         "overdue_invoices": receivables["overdue_count"],
+        "stock_value": stock_value,
+        "low_stock_products": low_stock,
     })
 
 
