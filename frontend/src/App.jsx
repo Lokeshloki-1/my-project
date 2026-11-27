@@ -40,6 +40,10 @@ import GoodsReceipts from './pages/GoodsReceipts'
 import GoodsReceiptDetail from './pages/GoodsReceiptDetail'
 import MaterialStock from './pages/MaterialStock'
 import Allocation from './pages/Allocation'
+import ProductionPlan from './pages/ProductionPlan'
+import ProductionOrderDetail from './pages/ProductionOrderDetail'
+import DailyOutput from './pages/DailyOutput'
+import ProductionLines from './pages/ProductionLines'
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
@@ -83,6 +87,11 @@ export default function App() {
         <Route path="material-stock" element={<MaterialStock />} />
         <Route path="allocation" element={<Allocation />} />
         <Route path="allocation/:id" element={<Allocation />} />
+        <Route path="production" element={<ProductionPlan />} />
+        <Route path="production/new" element={<ProductionOrderDetail key="new" />} />
+        <Route path="production/daily" element={<DailyOutput />} />
+        <Route path="production/lines" element={<ProductionLines />} />
+        <Route path="production/:id" element={<ProductionOrderDetail />} />
         <Route path="companies" element={<Companies />} />
         <Route path="employees" element={<Employees />} />
         <Route path="customers" element={<Customers />} />

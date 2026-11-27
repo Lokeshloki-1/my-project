@@ -27,6 +27,9 @@ from apps.development.models import BOMItem, Measurement, Sample, TechPack
 from apps.merchandising import services as merch
 from apps.procurement import services as proc
 from apps.stores import services as stores
+from apps.stores.models import MaterialAllocation
+from apps.production import services as prod
+from apps.production.models import ProductionLine, ProductionOrder
 from apps.stores.models import GoodsReceipt, GoodsReceiptLine
 from apps.procurement.models import PurchaseOrder, PurchaseOrderLine, RFQ, RFQLine, Supplier
 from apps.merchandising.models import CostSheet, CostSheetLine, OrderConfirmation, Quotation, QuotationLine
@@ -138,6 +141,7 @@ class Command(BaseCommand):
         self._seed_development(today)
         self._seed_procurement(today)
         self._seed_stores(today)
+        self._seed_production(today)
         self.stdout.write(self.style.SUCCESS("Demo data created. Login: admin / admin12345"))
 
     def _seed_buyers(self, company, today):
@@ -402,6 +406,50 @@ class Command(BaseCommand):
                             "remarks": "Shade variation in 1 roll vs approved lab dip" if rejected else ""})
         stores.inspect_grn(grn, manager, results, "4-point inspection on 10% of rolls; GSM and shade checked")
         stores.auto_allocate(po.requirement, sales, store)
+
+    def _seed_production(self, today):
+        """Sewing lines, NT-101 in production with a week of output, NT-205 planned next."""
+        sales = User.objects.get(username="sales")
+        order = OrderConfirmation.objects.get(buyer_po_no="NT-PO-2026-118")
+        company = order.company
+        lines = [ProductionLine.objects.create(company=company, code=f"L{i}", name=f"Line {i}", operators=ops,
+                                               efficiency_pct=Decimal(eff))
+                 for i, (ops, eff) in enumerate([(36, "62"), (32, "58"), (28, "55"), (40, "65")], start=1)]
+        # Fabric for the tee goes to production.
+        for alloc in MaterialAllocation.objects.filter(order=order, status="active", material__description__startswith="180"):
+            stores.issue_allocation(alloc, sales)
+        working = []
+        d = today
+        while len(working) < 6:
+            d -= timedelta(days=1)
+            if d.weekday() != 6:
+                working.append(d)
+        working.reverse()  # six past working days, oldest first
+        tee_line, hood_line = order.lines.get(style_no="NT-101"), order.lines.get(style_no="NT-205")
+        tee_tp = TechPack.objects.get(style_no="NT-101", status="released")
+        sizes = dict(zip(tee_tp.sizes, [600, 1000, 1200, 1200, 1100, 900]))
+        wo = ProductionOrder.objects.create(company=company, order=order, order_line=tee_line, tech_pack=tee_tp,
+                                            style_no="NT-101", colourway="Navy", quantity=6000, sizes=sizes, line=lines[0],
+                                            smv=Decimal("11.5"), planned_start=working[0],
+                                            planned_end=prod.add_working_days(working[0], 6), created_by=sales)
+        prod.log(wo, "planned", sales, f"6000 pcs on {lines[0].name}")
+        half = {k: v // 2 for k, v in sizes.items()}
+        rest = {k: v - half[k] for k, v in sizes.items()}
+        prod.add_entry(wo, sales, {"stage": "cutting", "date": working[0], "sizes": half, "lay_no": "LAY-01", "fabric_used": Decimal("545")})
+        prod.add_entry(wo, sales, {"stage": "cutting", "date": working[1], "sizes": rest, "lay_no": "LAY-02", "fabric_used": Decimal("548")})
+        for day, sewn, rej in zip(working[1:], [620, 760, 805, 790, 815], [6, 9, 7, 8, 5]):
+            prod.add_entry(wo, sales, {"stage": "sewing", "date": day, "quantity": sewn, "rejected": rej})
+        for day, fin, rej in zip(working[2:], [560, 720, 780, 790], [4, 6, 3, 5]):
+            prod.add_entry(wo, sales, {"stage": "finishing", "date": day, "quantity": fin, "rejected": rej})
+        hood_tp = TechPack.objects.get(style_no="NT-205", status="released")
+        hsizes = dict(zip(hood_tp.sizes, [300, 500, 600, 600, 550, 450]))
+        start = prod.add_working_days(today, 3)
+        hwo = ProductionOrder.objects.create(company=company, order=order, order_line=hood_line, tech_pack=hood_tp,
+                                             style_no="NT-205", colourway="Heather grey", quantity=3000, sizes=hsizes,
+                                             line=lines[1], smv=Decimal("22"), planned_start=start,
+                                             planned_end=prod.capacity(lines[1], Decimal("22"), 3000, start)["suggested_end"],
+                                             created_by=sales)
+        prod.log(hwo, "planned", sales, f"3000 pcs on {lines[1].name}")
 
     def _issue_with_restock(self, order):
         """Take stock for the order; if a product is short, record a restock receipt first (like a purchase)."""

@@ -61,6 +61,16 @@ stock and warehouses, invoices and payments, monthly sales reports and **DDP (De
 - **Stock allocation** to confirmed orders from their material requirement (by hand or *Allocate all free stock*),
   then **issue to production** or release.
 
+**Production: planning → cutting → sewing → finishing** (textile flow, step 6 — [API reference](docs/api/production.md))
+- **Sewing lines** with operators, minutes and efficiency.
+- **Planning**: a work order per style of a confirmed order with a size breakdown, line and SMV. The daily target
+  (operators × minutes × efficiency ÷ SMV) gives a suggested end date; warnings for missing the shipment date,
+  line clashes and styles without PP approval. A **plan board** shows each line's work orders on a timeline.
+- **Cutting** by size (with a cut allowance), **sewing** and **finishing** output per day with rejects. A stage can
+  never get ahead of the previous one; work in progress between stages is always visible. Behind-plan warnings.
+- **Daily output** per line: target vs actual and efficiency.
+- The work order shows which materials have been issued to production by the stores.
+
 **ERP**
 - **Companies** – run more than one business entity (e.g. a manufacturing company and an export company).
 - **Employees & departments** – employee code, designation, salary, monthly sales target, status.
@@ -135,6 +145,7 @@ backend/
     accounts/       User model (with role), login API, permissions
     companies/      Company model + seed_demo command
     employees/      Department, Employee
+    production/     Sewing lines, work orders, cutting / sewing / finishing output, daily report (services.py)
     stores/         Raw materials: goods receipts, inspection, material stock ledger, allocation (services.py)
     procurement/    Suppliers, material requirements, RFQs with quote comparison, supplier POs (services.py)
     development/    Tech packs (measurements, BOM, revisions), samples, measurement check (services.py)
