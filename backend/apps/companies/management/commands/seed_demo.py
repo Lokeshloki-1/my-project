@@ -22,6 +22,8 @@ from apps.buyers import services as buyer_services
 from apps.buyers.models import Buyer, BuyerContact, BuyerEnquiry, BuyerRequirement
 from apps.companies.models import Company
 from apps.ddp.models import Shipment
+from apps.development import services as dev
+from apps.development.models import BOMItem, Measurement, Sample, TechPack
 from apps.merchandising import services as merch
 from apps.merchandising.models import CostSheet, CostSheetLine, OrderConfirmation, Quotation, QuotationLine
 from apps.employees.models import Department, Employee
@@ -129,6 +131,7 @@ class Command(BaseCommand):
 
         self._seed_buyers(companies[0], today)
         self._seed_merchandising(today)
+        self._seed_development(today)
         self.stdout.write(self.style.SUCCESS("Demo data created. Login: admin / admin12345"))
 
     def _seed_buyers(self, company, today):
@@ -242,6 +245,79 @@ class Command(BaseCommand):
         OrderConfirmation.objects.filter(pk=order.pk).update(buyer_po_no="NT-PO-2026-118", po_date=today - timedelta(days=3))
         merch.send_quotation(quote([(sheets[1], 2500)], days_ago=2), sales)
         quote([(sheets[0], 4000)], days_ago=0)
+
+    def _seed_development(self, today):
+        """Tech packs and samples at different stages for the approved demo buyer."""
+        sales = User.objects.get(username="sales")
+        manager = User.objects.get(username="manager")
+        buyer = Buyer.objects.get(legal_name="Nordic Threads AB")
+        sizes = ["2Y", "4Y", "6Y", "8Y", "10Y", "12Y"]
+        styles = [
+            ("NT-101", "Kids organic crew-neck tee", 180, ["Navy", "Off white", "Sage"], [
+                ("A", "Chest width (2.5 cm below armhole)", "1.0", [29, 31, 33, 35, 37, 39]),
+                ("B", "Body length from HPS", "1.0", [38, 42, 46, 50, 54, 58]),
+                ("C", "Sleeve length", "0.5", [11, 12, 13, 14, 15, 16]),
+                ("D", "Neck opening", "0.5", [15, 15.5, 16, 16.5, 17, 17.5]),
+            ]),
+            ("NT-205", "Kids hooded sweatshirt", 280, ["Heather grey", "Navy"], [
+                ("A", "Chest width", "1.0", [33, 35, 37, 39, 41, 43]),
+                ("B", "Body length from HPS", "1.0", [39, 43, 47, 51, 55, 59]),
+                ("C", "Sleeve length from CB", "1.0", [40, 45, 50, 55, 60, 65]),
+            ]),
+        ]
+        packs = []
+        for style_no, name, gsm, colours, poms in styles:
+            sheet = CostSheet.objects.filter(buyer=buyer, style_no=style_no).first()
+            tp = TechPack.objects.create(
+                company=buyer.company, buyer=buyer, style_no=style_no, style_name=name, season="SS27",
+                category="kidswear", fabric_composition="100% organic cotton", gsm=gsm, colourways=colours,
+                sizes=sizes, base_size="6Y", cost_sheet=sheet, created_by=sales,
+                construction="Twin-needle hems, coverstitch armholes, self-fabric neck binding",
+                wash_care="Machine wash 40°C, do not tumble dry, iron low", packing="1 pc per polybag, 24 pcs per carton, solid size",
+            )
+            for i, (code, point, tol, vals) in enumerate(poms):
+                Measurement.objects.create(tech_pack=tp, position=i, code=code, point=point, tolerance=Decimal(tol),
+                                           values={sz: str(v) for sz, v in zip(sizes, vals)})
+            for i, (cat, desc, supplier, place) in enumerate([
+                ("fabric", f"{gsm} GSM organic cotton", "Tiruppur Knit Fabrics", "Body"),
+                ("label", "Woven main label", "Avery Dennison", "Back neck"),
+                ("label", "Care label (GOTS)", "Avery Dennison", "Left side seam"),
+                ("thread", "Polyester core-spun thread", "Coats", "All seams"),
+                ("packaging", "Recycled polybag", "Local", ""),
+            ]):
+                BOMItem.objects.create(tech_pack=tp, position=i, category=cat, description=desc, supplier=supplier, placement=place)
+            dev.log("tech_pack", tp, "created", sales)
+            dev.release_tech_pack(tp, manager)
+            packs.append(tp)
+
+        def sample(tp, kind, colour, days_ago, due_in):
+            s = Sample.objects.create(company=tp.company, tech_pack=tp, buyer=buyer, sample_type=kind,
+                                      round=dev.next_round(tp, kind), colourway=colour, size=tp.base_size, quantity=2,
+                                      requested_on=today - timedelta(days=days_ago), due_date=today + timedelta(days=due_in),
+                                      created_by=sales)
+            dev.log("sample", s, "requested", sales)
+            return s
+
+        tee, hood = packs
+        def through_sent(s):
+            dev.start_sample(s, sales); dev.mark_ready(s, sales); dev.send_sample(s, sales, "DHL", f"JD01{s.pk:06d}")
+            return s
+        proto = through_sent(sample(tee, "proto", "Navy", 40, -30))
+        dev.decide_sample(proto, sales, "approved", "")
+        fit = through_sent(sample(tee, "fit", "Navy", 25, -12))
+        pom = {m.code: m for m in tee.measurements.all()}
+        dev.record_measurements(fit, sales, [{"measurement": pom["A"].id, "actual": "33.5"},
+                                             {"measurement": pom["B"].id, "actual": "48"},
+                                             {"measurement": pom["C"].id, "actual": "13"},
+                                             {"measurement": pom["D"].id, "actual": "16.5"}])
+        dev.decide_sample(fit, sales, "rejected", "Body length 2 cm too long; neck opening tight")
+        fit2 = dev.resubmit_sample(fit, sales)
+        dev.start_sample(fit2, sales)
+        pp = through_sent(sample(tee, "pp", "Off white", 6, -1))
+        dev.decide_sample(pp, sales, "approved_with_comments", "Approved. Use softer neck tape in bulk.")
+        sample(hood, "proto", "Heather grey", 3, 7)
+        late = sample(hood, "salesman", "Navy", 15, -2)
+        dev.start_sample(late, sales)
 
     def _issue_with_restock(self, order):
         """Take stock for the order; if a product is short, record a restock receipt first (like a purchase)."""

@@ -25,6 +25,10 @@ import Quotations from './pages/Quotations'
 import QuotationDetail from './pages/QuotationDetail'
 import Orders from './pages/Orders'
 import OrderDetail from './pages/OrderDetail'
+import TechPacks from './pages/TechPacks'
+import TechPackDetail from './pages/TechPackDetail'
+import Samples from './pages/Samples'
+import SampleDetail from './pages/SampleDetail'
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
@@ -49,6 +53,10 @@ export default function App() {
         <Route path="quotations/:id" element={<QuotationDetail />} />
         <Route path="orders" element={<Orders />} />
         <Route path="orders/:id" element={<OrderDetail />} />
+        <Route path="tech-packs" element={<TechPacks />} />
+        <Route path="tech-packs/:id" element={<TechPackDetail />} />
+        <Route path="samples" element={<Samples />} />
+        <Route path="samples/:id" element={<SampleDetail />} />
         <Route path="companies" element={<Companies />} />
         <Route path="employees" element={<Employees />} />
         <Route path="customers" element={<Customers />} />

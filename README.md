@@ -32,6 +32,16 @@ stock and warehouses, invoices and payments, monthly sales reports and **DDP (De
   quantities, then confirm. The **credit limit** from the buyer's credit check is checked; going over it needs a
   manager and a recorded reason.
 
+**Product development: tech pack → sampling → approval** (textile flow, step 3 — [API reference](docs/api/product-development.md))
+- **Tech packs** per style and buyer: spec, colourways, a **measurement chart** (points of measure × sizes,
+  with ± tolerance and size presets), **bill of materials**, construction, wash care and packing. A manager
+  releases it; changing a released tech pack makes a new revision and keeps the old one.
+- **Samples** (proto, fit, size set, salesman, photo, PP, TOP) from a released tech pack, on a board:
+  requested → in progress → ready → sent (courier + tracking) → approved / approved with comments / rejected.
+  Overdue samples are flagged. *Make next round* creates round 2 with the buyer's comments as instructions.
+- **Measurement check**: enter the measured values of a sample; each point is checked against spec ± tolerance.
+- An approved **PP sample** marks the style **approved for production**.
+
 **ERP**
 - **Companies** – run more than one business entity (e.g. a manufacturing company and an export company).
 - **Employees & departments** – employee code, designation, salary, monthly sales target, status.
@@ -106,6 +116,7 @@ backend/
     accounts/       User model (with role), login API, permissions
     companies/      Company model + seed_demo command
     employees/      Department, Employee
+    development/    Tech packs (measurements, BOM, revisions), samples, measurement check (services.py)
     merchandising/  Cost sheets, quotations, order confirmations, credit-limit check (services.py)
     buyers/         Buyer onboarding: enquiry, buyer, contacts, requirements, credit checks, approval (services.py)
     sales/          Customer, Product, SalesOrder, SalesOrderItem
