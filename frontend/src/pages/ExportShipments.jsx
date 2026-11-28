@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import api, { downloadFile, errorMessage } from '../api/client'
+import { useAuth } from '../auth/AuthContext'
 import Modal from '../components/Modal'
 import ResourcePage from '../components/ResourcePage'
 import useOptions from '../components/useOptions'
@@ -49,6 +50,7 @@ function ShipmentList() {
 }
 
 function ShipmentDetail({ id }) {
+  const { canFinance } = useAuth()
   const [query] = useSearchParams()
   const navigate = useNavigate()
   const [s, setS] = useState(null)
@@ -120,6 +122,9 @@ function ShipmentDetail({ id }) {
           {can('book') && <button onClick={() => act('book')} disabled={busy}>Book</button>}
           {can('ship') && <button className="approve" onClick={() => setDialog('ship')} disabled={busy}>Mark shipped</button>}
           {can('deliver') && <button onClick={() => act('deliver')} disabled={busy}>Mark delivered</button>}
+          {s && ['shipped', 'delivered'].includes(s.status) && (s.sales_invoice_id
+            ? <Link className="button secondary" to={`/finance/invoices/${s.sales_invoice_id}`}>Sales invoice →</Link>
+            : canFinance && <button className="approve" onClick={() => setDialog('invoice')}>Create sales invoice</button>)}
         </div>
       </div>
       {error && <div className="error">{error}</div>}
@@ -254,9 +259,32 @@ function ShipmentDetail({ id }) {
       </div>
 
       {dialog === 'cancel' && <ReasonDialog title={`Cancel ${s.shipment_no}?`} text="The packing lists become free for another shipment." label="Reason" required button="Cancel shipment" tone="danger" busy={busy} onClose={() => setDialog(null)} onConfirm={(r) => act('cancel', { reason: r })} />}
+      {dialog === 'invoice' && <InvoiceDialog shipment={s} onClose={() => setDialog(null)} onDone={(inv) => navigate(`/finance/invoices/${inv.id}`)} />}
       {dialog === 'ship' && <ShipDialog busy={busy} onClose={() => setDialog(null)} onShip={(d) => act('ship', { on_board_date: d })} />}
       {dialog?.doc && <DocDialog doc={dialog.doc} onClose={() => setDialog(null)} onSave={(patch) => { updateDoc(dialog.doc, patch); setDialog(null) }} />}
     </>
+  )
+}
+
+function InvoiceDialog({ shipment, onClose, onDone }) {
+  const [rate, setRate] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const submit = async (e) => {
+    e.preventDefault(); setBusy(true); setError('')
+    try { onDone((await api.post('/export-invoices/create-from-shipment/', { shipment: shipment.id, exchange_rate: rate })).data) } catch (err) { setError(errorMessage(err)); setBusy(false) }
+  }
+  const total = Number(shipment.invoice.total)
+  return (
+    <Modal title={`Sales invoice ${shipment.invoice_no}`} onClose={onClose}>
+      <form onSubmit={submit}>
+        <p className="muted small">Raises the receivable for {money(total, shipment.currency)}. Use the exchange rate on the shipping bill (customs notified rate).</p>
+        <label className="field"><span>Exchange rate (₹ per {shipment.currency}) *</span><input type="number" min="0.0001" step="0.0001" value={rate} onChange={(e) => setRate(e.target.value)} required autoFocus /></label>
+        {Number(rate) > 0 && <p className="small">= ₹{(total * Number(rate)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>}
+        {error && <div className="error">{error}</div>}
+        <div className="modal-foot"><span /><div><button type="button" className="secondary" onClick={onClose}>Cancel</button><button type="submit" className="approve" disabled={busy}>Create invoice</button></div></div>
+      </form>
+    </Modal>
   )
 }
 

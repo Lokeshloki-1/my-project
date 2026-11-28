@@ -40,6 +40,7 @@ export default function Dashboard() {
       </div>
 
       <BuyerOnboardingCard />
+      <ExportMoneyCard />
 
       <div className="grid-2">
         <div className="card">
@@ -56,7 +57,7 @@ export default function Dashboard() {
         </div>
         <div className="card">
           <h2>Top salespeople · {team.label}</h2>
-          <table>
+          <div className="table-wrap"><table>
             <thead><tr><th>Employee</th><th className="num">Sales</th><th className="num">Target</th></tr></thead>
             <tbody>
               {team.employees.slice(0, 6).map((e) => (
@@ -67,10 +68,28 @@ export default function Dashboard() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>
       </div>
     </>
+  )
+}
+
+function ExportMoneyCard() {
+  const [s, setS] = useState(null)
+  useEffect(() => { api.get('/export-invoices/summary/').then((r) => setS(r.data)).catch(() => setS(null)) }, [])
+  if (!s) return null
+  const inrFmt = (v) => money(v)
+  return (
+    <div className="card">
+      <div className="card-head"><h2>Export receivables</h2><Link to="/finance/receivables">Open receivables →</Link></div>
+      <div className="funnel four">
+        <Link to="/finance/receivables" className="funnel-step"><span className="kpi-value">{inrFmt(s.receivable_inr)}</span><span className="muted small">Outstanding</span></Link>
+        <Link to="/finance/receivables" className="funnel-step"><span className={`kpi-value ${Number(s.overdue_inr) ? 'neg' : ''}`}>{inrFmt(s.overdue_inr)}</span><span className="muted small">Overdue ({s.overdue_invoices})</span></Link>
+        <Link to="/finance/invoices" className="funnel-step"><span className="kpi-value">{inrFmt(s.collected_this_month_inr)}</span><span className="muted small">Collected this month</span></Link>
+        <Link to="/shipments" className="funnel-step"><span className={`kpi-value ${s.shipped_not_invoiced ? 'neg' : ''}`}>{s.shipped_not_invoiced}</span><span className="muted small">Shipped, not invoiced</span></Link>
+      </div>
+    </div>
   )
 }
 

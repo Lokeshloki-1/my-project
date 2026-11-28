@@ -31,6 +31,8 @@ from apps.stores.models import MaterialAllocation
 from apps.production import services as prod
 from apps.quality import services as qa
 from apps.exports import services as exp
+from apps.finance import services as fin
+from apps.finance.models import OrderExpense
 from apps.exports.models import CartonGroup, ExportShipment, PackingList
 from apps.quality.models import DefectType, FinalInspection
 from apps.production.models import ProductionLine, ProductionOrder
@@ -148,6 +150,7 @@ class Command(BaseCommand):
         self._seed_production(today)
         self._seed_quality(today)
         self._seed_exports(today)
+        self._seed_finance(today)
         self.stdout.write(self.style.SUCCESS("Demo data created. Login: admin / admin12345"))
 
     def _seed_buyers(self, company, today):
@@ -523,6 +526,23 @@ class Command(BaseCommand):
         exp.attach_packing_lists(shipment, [pl], sales)
         exp.log("shipment", shipment, "created", sales)
         exp.book_shipment(shipment, sales)
+
+    def _seed_finance(self, today):
+        """Ship the booked shipment, invoice it, record a part payment and the order's expenses."""
+        accounts = User.objects.get(username="accounts")
+        sales = User.objects.get(username="sales")
+        shipment = ExportShipment.objects.filter(status="booked").order_by("id").first()
+        ExportShipment.objects.filter(pk=shipment.pk).update(container_no="MSKU7712045", seal_no="ML-448812", bl_no="MAEU261100733",
+                                                             shipping_bill_no="8823311", shipping_bill_date=today - timedelta(days=1))
+        exp.ship(shipment, sales, today - timedelta(days=1))
+        inv, _ = fin.create_invoice(shipment, accounts, Decimal("83.45"))
+        fin.record_receipt(inv, accounts, {"received_on": today, "amount": (inv.amount * Decimal("0.4")).quantize(Decimal("0.01")),
+                                           "bank_charges": Decimal("25"), "exchange_rate": Decimal("83.80"), "method": "tt",
+                                           "bank_reference": "FIRC/HDFC/26/1183", "note": "40% advance against B/L copy"})
+        for cat, amount, note in [("freight", "18500", "Inland haulage + THC Chennai"), ("clearing", "6500", "CHA charges"),
+                                  ("courier", "2400", "Original documents to buyer bank"), ("testing", "8000", "SGS final inspection")]:
+            OrderExpense.objects.create(company=shipment.company, order=shipment.order, date=today, category=cat,
+                                        amount_inr=Decimal(amount), note=note, created_by=accounts)
 
     def _issue_with_restock(self, order):
         """Take stock for the order; if a product is short, record a restock receipt first (like a purchase)."""

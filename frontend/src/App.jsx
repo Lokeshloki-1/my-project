@@ -50,6 +50,9 @@ import FinalInspections from './pages/FinalInspections'
 import DefectTypes from './pages/DefectTypes'
 import PackingLists from './pages/PackingLists'
 import ExportShipments from './pages/ExportShipments'
+import ExportInvoices from './pages/ExportInvoices'
+import Receivables from './pages/Receivables'
+import OrderProfit from './pages/OrderProfit'
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
@@ -107,6 +110,11 @@ export default function App() {
         <Route path="packing/:id" element={<PackingLists key="pl" />} />
         <Route path="shipments" element={<ExportShipments />} />
         <Route path="shipments/:id" element={<ExportShipments key="sh" />} />
+        <Route path="finance/invoices" element={<ExportInvoices />} />
+        <Route path="finance/invoices/:id" element={<ExportInvoices key="inv" />} />
+        <Route path="finance/receivables" element={<Receivables />} />
+        <Route path="finance/profit" element={<OrderProfit />} />
+        <Route path="finance/profit/:id" element={<OrderProfit key="op" />} />
         <Route path="companies" element={<Companies />} />
         <Route path="employees" element={<Employees />} />
         <Route path="customers" element={<Customers />} />

@@ -613,3 +613,24 @@ a.button { white-space: nowrap; }
   .pl-totals { grid-template-columns: repeat(3, 1fr); }
   .cg-sum { margin-left: 0; }
 }
+
+/* Finance */
+[class*='badge-inv-'] { text-transform: none; }
+.badge-inv-open { background: #dbeafe; color: #1e40af; }
+.badge-inv-partially_paid { background: #fef3c7; color: #92400e; }
+.badge-inv-paid { background: #dcfce7; color: #166534; }
+.badge-inv-cancelled { background: #fee2e2; color: #991b1b; }
+.pay-preview { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 10px 0; padding: 12px; background: var(--hover); border-radius: 8px; }
+.pay-preview div { display: flex; flex-direction: column; }
+.pay-preview span { font-size: 12px; color: var(--muted); }
+.pay-preview b { font-size: 16px; font-variant-numeric: tabular-nums; }
+table.pnl td { padding: 10px 4px; border-bottom: 1px solid var(--line); white-space: normal; }
+table.pnl td.num { white-space: nowrap; font-size: 15px; }
+table.pnl tr.total td { font-weight: 700; font-size: 17px; border-top: 2px solid var(--text); border-bottom: 0; }
+.expense-form { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 12px; }
+.expense-form button { grid-column: 1 / -1; }
+@media (max-width: 900px) { .pay-preview { grid-template-columns: repeat(2, 1fr); } .funnel { grid-template-columns: repeat(2, 1fr); } }
+.funnel.four { grid-template-columns: repeat(4, 1fr); } @media (max-width: 900px) { .funnel.four { grid-template-columns: repeat(2, 1fr); } }
+
+/* Grid columns may shrink below their content (charts, wide text) instead of widening the page. */
+.grid-2 > *, .order-layout > * { min-width: 0; }

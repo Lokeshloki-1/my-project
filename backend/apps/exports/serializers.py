@@ -171,6 +171,7 @@ class ExportShipmentSerializer(serializers.ModelSerializer):
     warnings = serializers.SerializerMethodField()
     allowed_actions = serializers.SerializerMethodField()
     history = serializers.SerializerMethodField()
+    sales_invoice_id = serializers.SerializerMethodField()
 
     class Meta:
         model = ExportShipment
@@ -179,7 +180,7 @@ class ExportShipmentSerializer(serializers.ModelSerializer):
                   "carrier", "vessel", "voyage", "container_type", "container_no", "seal_no", "etd", "eta", "on_board_date",
                   "delivered_date", "bl_no", "shipping_bill_no", "shipping_bill_date", "invoice_no", "invoice_date", "hs_codes",
                   "notes", "status", "status_label", "cancel_reason", "packing_list_ids", "packing_lists", "documents", "totals",
-                  "invoice", "warnings", "allowed_actions", "history", "created_at", "updated_at"]
+                  "invoice", "warnings", "allowed_actions", "history", "sales_invoice_id", "created_at", "updated_at"]
         read_only_fields = ["shipment_no", "company", "on_board_date", "delivered_date", "invoice_no", "status", "cancel_reason",
                             "created_at", "updated_at"]
 
@@ -204,6 +205,10 @@ class ExportShipmentSerializer(serializers.ModelSerializer):
 
     def get_allowed_actions(self, obj):
         return services.shipment_actions(obj, self.context["request"].user)
+
+    def get_sales_invoice_id(self, obj):
+        """The finance sales invoice raised for this shipment, if any."""
+        return obj.export_invoice.id if hasattr(obj, "export_invoice") else None
 
     def get_history(self, obj):
         return ActivityLogSerializer(services.history("shipment", obj.pk), many=True).data

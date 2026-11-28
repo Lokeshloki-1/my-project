@@ -90,6 +90,17 @@ stock and warehouses, invoices and payments, monthly sales reports and **DDP (De
   inspection and insurance certificates, beneficiary certificate) and a **commercial invoice PDF** with HS codes and
   the amount in words.
 
+**Finance & accounts: sales invoice → payment → receivables → profit** (textile flow, step 9 — [API reference](docs/api/finance.md))
+- **Export sales invoices** raised from shipped shipments in the buyer's currency, with the INR value at the
+  shipping-bill rate and a due date from the payment terms.
+- **Payments** (TT, LC, DA/DP, advance) with bank charges and the realised rate; **exchange gain / loss** per receipt;
+  FIRC / BRC references.
+- **Receivables** ageing by buyer (not due, 1–30, 31–60, 61–90, 90+ days) with credit limits, and a dashboard card.
+- **Order profit**: invoiced revenue minus materials issued (matched per style to what shipped), conversion from the
+  cost sheets, order expenses and bank charges, plus exchange gain/loss — against the planned margin, with warnings
+  when material is still allocated but not issued.
+- Domestic GST invoices and UPI payments stay under **Domestic Billing**.
+
 **ERP**
 - **Companies** – run more than one business entity (e.g. a manufacturing company and an export company).
 - **Employees & departments** – employee code, designation, salary, monthly sales target, status.
@@ -164,6 +175,7 @@ backend/
     accounts/       User model (with role), login API, permissions
     companies/      Company model + seed_demo command
     employees/      Department, Employee
+    finance/        Export invoices, receipts with exchange gain/loss, receivables ageing, order profit (services.py)
     exports/        Packing lists, export shipments, export documents, invoice & packing-list PDFs
     quality/        Defect library, inline QC (DHU), AQL final inspection (aql.py), corrective actions, summary
     production/     Sewing lines, work orders, cutting / sewing / finishing output, daily report (services.py)
