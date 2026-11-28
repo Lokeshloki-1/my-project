@@ -4,7 +4,34 @@ from django.http import JsonResponse
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from apps.buyers.views import (
+    BuyerContactViewSet,
+    BuyerEnquiryViewSet,
+    BuyerRequirementViewSet,
+    BuyerViewSet,
+    CreditCheckViewSet,
+)
 from apps.billing.views import InvoiceViewSet, PaymentViewSet, RazorpayWebhookView
+from apps.merchandising.views import CostSheetViewSet, OrderConfirmationViewSet, QuotationViewSet
+from apps.development.views import SampleViewSet, TechPackViewSet
+from apps.procurement.views import MaterialRequirementViewSet, PurchaseOrderViewSet, RFQViewSet, SupplierViewSet
+from apps.stores.views import (
+    AllocationViewSet,
+    GoodsReceiptViewSet,
+    MaterialMovementViewSet,
+    MaterialStockViewSet,
+    MaterialViewSet,
+)
+from apps.production.views import ProductionEntryViewSet, ProductionLineViewSet, ProductionOrderViewSet
+from apps.quality.views import (
+    CorrectiveActionViewSet,
+    DefectTypeViewSet,
+    FinalInspectionViewSet,
+    InlineInspectionViewSet,
+    QualitySummaryViewSet,
+)
+from apps.exports.views import ExportDocumentViewSet, ExportShipmentViewSet, PackingListViewSet
+from apps.finance.views import ExportInvoiceViewSet, ExportReceiptViewSet, OrderExpenseViewSet, OrderProfitViewSet
 from apps.companies.views import CompanyViewSet
 from apps.ddp.views import ShipmentViewSet
 from apps.employees.views import DepartmentViewSet, EmployeeViewSet
@@ -24,6 +51,40 @@ router.register("payments", PaymentViewSet)
 router.register("warehouses", WarehouseViewSet)
 router.register("stock-levels", StockLevelViewSet)
 router.register("stock-movements", StockMovementViewSet)
+router.register("buyer-enquiries", BuyerEnquiryViewSet)
+router.register("buyers", BuyerViewSet)
+router.register("buyer-contacts", BuyerContactViewSet)
+router.register("buyer-requirements", BuyerRequirementViewSet)
+router.register("credit-checks", CreditCheckViewSet)
+router.register("cost-sheets", CostSheetViewSet)
+router.register("quotations", QuotationViewSet)
+router.register("order-confirmations", OrderConfirmationViewSet)
+router.register("tech-packs", TechPackViewSet)
+router.register("samples", SampleViewSet)
+router.register("suppliers", SupplierViewSet)
+router.register("material-requirements", MaterialRequirementViewSet)
+router.register("rfqs", RFQViewSet)
+router.register("purchase-orders", PurchaseOrderViewSet)
+router.register("materials", MaterialViewSet)
+router.register("material-stock", MaterialStockViewSet)
+router.register("material-movements", MaterialMovementViewSet)
+router.register("goods-receipts", GoodsReceiptViewSet)
+router.register("material-allocations", AllocationViewSet)
+router.register("production-lines", ProductionLineViewSet)
+router.register("production-orders", ProductionOrderViewSet)
+router.register("production-entries", ProductionEntryViewSet)
+router.register("defect-types", DefectTypeViewSet)
+router.register("inline-inspections", InlineInspectionViewSet)
+router.register("final-inspections", FinalInspectionViewSet)
+router.register("corrective-actions", CorrectiveActionViewSet)
+router.register("packing-lists", PackingListViewSet)
+router.register("export-shipments", ExportShipmentViewSet)
+router.register("export-documents", ExportDocumentViewSet)
+router.register("export-invoices", ExportInvoiceViewSet)
+router.register("export-receipts", ExportReceiptViewSet)
+router.register("order-expenses", OrderExpenseViewSet)
+router.register("order-profit", OrderProfitViewSet, basename="order-profit")
+router.register("quality-summary", QualitySummaryViewSet, basename="quality-summary")
 
 def health(request):
     """For uptime monitors and Docker: 200 when the app and database are working."""

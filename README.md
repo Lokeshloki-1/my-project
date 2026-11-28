@@ -1,6 +1,6 @@
 # Hazpo ERP
 
-A small ERP for managing companies, employees, customers, products, sales orders,
+A small ERP for textile exporters: buyer onboarding, companies, employees, customers, products, sales orders,
 stock and warehouses, invoices and payments, monthly sales reports and **DDP (Delivered Duty Paid)** export shipments.
 
 | Layer    | Technology |
@@ -10,6 +10,96 @@ stock and warehouses, invoices and payments, monthly sales reports and **DDP (De
 | Database | PostgreSQL 16 |
 
 ## Features
+
+**Buyer onboarding** (textile flow, step 1 — [API reference](docs/api/buyer-onboarding.md))
+- Buyer Enquiry → Registration → Profile → Contact Details → Requirements → Credit Verification → Approval.
+- **Enquiries** from email, trade fairs, agents or the website; *Convert to buyer* creates the buyer with its contact.
+- **Buyer page** with a 7-step progress bar that says exactly what is still missing, and tabs for profile,
+  contacts (one primary), requirements (product categories, GSM, sizes, target price, GOTS / OEKO-TEX / BSCI …),
+  credit checks and a timeline of every status change.
+- **Credit verification** by accounts: credit limit, payment terms (LC, TT, DA/DP, advance), risk rating,
+  bank/trade references, ECGC cover, pass or fail. Credit checks are never edited or deleted.
+- **Approval** by a manager or admin creates the **customer**, so only approved buyers can get orders and invoices.
+- **Buyer pipeline** board and a dashboard card showing how many buyers are at each step.
+
+**Costing → Quotation → Order confirmation** (textile flow, step 2 — [API reference](docs/api/costing-quotation-order.md))
+- **Cost sheets** per style: fabric (consumption × rate + wastage), trims, print, washing, CMT, testing, packing,
+  freight, then overhead %, margin % and agent commission % → **FOB price per piece**, updated live as you type.
+  A manager approves the cost sheet; *Copy* makes a revised costing.
+- **Quotations** for approved buyers only, built from approved cost sheets. Price defaults to the FOB price and
+  is flagged when it is below cost. Draft → sent → accepted / rejected, with validity dates.
+- **Order confirmations** from accepted quotations: enter the buyer's PO number, shipment date and final
+  quantities, then confirm. The **credit limit** from the buyer's credit check is checked; going over it needs a
+  manager and a recorded reason.
+
+**Product development: tech pack → sampling → approval** (textile flow, step 3 — [API reference](docs/api/product-development.md))
+- **Tech packs** per style and buyer: spec, colourways, a **measurement chart** (points of measure × sizes,
+  with ± tolerance and size presets), **bill of materials**, construction, wash care and packing. A manager
+  releases it; changing a released tech pack makes a new revision and keeps the old one.
+- **Samples** (proto, fit, size set, salesman, photo, PP, TOP) from a released tech pack, on a board:
+  requested → in progress → ready → sent (courier + tracking) → approved / approved with comments / rejected.
+  Overdue samples are flagged. *Make next round* creates round 2 with the buyer's comments as instructions.
+- **Measurement check**: enter the measured values of a sample; each point is checked against spec ± tolerance.
+- An approved **PP sample** marks the style **approved for production**.
+
+**Purchase & procurement: material requirement → RFQ → supplier PO** (textile flow, step 4 — [API reference](docs/api/purchase-procurement.md))
+- **Material requirement** from a confirmed order: order pieces × tech pack BOM consumption + wastage %, with the
+  same material across styles added together. Warns about styles without a tech pack or consumption.
+  Shows ordered and open quantity per material.
+- **RFQs** to several suppliers (suggested by what they supply), price entry per supplier, a side-by-side
+  comparison with the lowest price per line and lowest total, and **award** → draft PO.
+- **Supplier POs**: manager approval, over-ordering warning, print view for the supplier, sent / cancelled.
+- **Suppliers** with categories, payment terms and lead time.
+
+**Inventory & warehouse: goods receipt → inspection → stock allocation** (textile flow, step 5 — [API reference](docs/api/inventory-warehouse.md))
+- **Goods receipts** against sent supplier POs: challan, invoice, vehicle, lot / dye lot and rolls; up to 10% over
+  the PO quantity. Nothing goes into stock until it is inspected.
+- **Inspection** per line: rejected quantity with findings; only accepted material goes into stock at the PO price,
+  rejections are listed for return to the supplier. POs show received and accepted quantities.
+- **Material stock** per store: on hand, allocated, free, average cost and value; a permanent movement ledger;
+  manager stock-count adjustments.
+- **Stock allocation** to confirmed orders from their material requirement (by hand or *Allocate all free stock*),
+  then **issue to production** or release.
+
+**Production: planning → cutting → sewing → finishing** (textile flow, step 6 — [API reference](docs/api/production.md))
+- **Sewing lines** with operators, minutes and efficiency.
+- **Planning**: a work order per style of a confirmed order with a size breakdown, line and SMV. The daily target
+  (operators × minutes × efficiency ÷ SMV) gives a suggested end date; warnings for missing the shipment date,
+  line clashes and styles without PP approval. A **plan board** shows each line's work orders on a timeline.
+- **Cutting** by size (with a cut allowance), **sewing** and **finishing** output per day with rejects. A stage can
+  never get ahead of the previous one; work in progress between stages is always visible. Behind-plan warnings.
+- **Daily output** per line: target vs actual and efficiency.
+- The work order shows which materials have been issued to production by the stores.
+
+**Quality: inline QC → final inspection → defect control** (textile flow, step 7 — [API reference](docs/api/quality.md))
+- **Defect library** (20 standard garment defects to start with) with category and default severity.
+- **Inline QC** on sewing lines: pieces checked, defects with quick counters, live **DHU** with a green / amber / red
+  light; a red check opens a corrective action.
+- **Final inspection (AQL)**: sample size and accept/reject numbers from the AQL chart (General Level II),
+  critical / major / minor defects, a packing & label checklist, a pass or fail verdict with reasons, and
+  re-inspection rounds.
+- **Defect control**: Pareto chart of the top defects, DHU by line and by style, final pass rate, and corrective
+  actions with owners, due dates and manager close-out (root cause + action).
+
+**Packing & export: packing list → shipping → export documents** (textile flow, step 8 — [API reference](docs/api/packing-export.md))
+- **Packing lists** with carton ranges, pieces per size per carton, net/gross weight and carton size; totals in cartons,
+  pieces, kg and CBM; PDF with shipping marks. **Only pieces that passed final inspection can be packed.**
+- **Export shipments** (sea / air / road / courier): ports, forwarder, vessel or flight, container and seal, B/L or AWB,
+  shipping bill; planned → booked → shipped → delivered with the checks each step needs.
+- **Export documents**: a checklist per shipment (invoice, packing list, shipping bill, B/L, certificate of origin,
+  inspection and insurance certificates, beneficiary certificate) and a **commercial invoice PDF** with HS codes and
+  the amount in words.
+
+**Finance & accounts: sales invoice → payment → receivables → profit** (textile flow, step 9 — [API reference](docs/api/finance.md))
+- **Export sales invoices** raised from shipped shipments in the buyer's currency, with the INR value at the
+  shipping-bill rate and a due date from the payment terms.
+- **Payments** (TT, LC, DA/DP, advance) with bank charges and the realised rate; **exchange gain / loss** per receipt;
+  FIRC / BRC references.
+- **Receivables** ageing by buyer (not due, 1–30, 31–60, 61–90, 90+ days) with credit limits, and a dashboard card.
+- **Order profit**: invoiced revenue minus materials issued (matched per style to what shipped), conversion from the
+  cost sheets, order expenses and bank charges, plus exchange gain/loss — against the planned margin, with warnings
+  when material is still allocated but not issued.
+- Domestic GST invoices and UPI payments stay under **Domestic Billing**.
 
 **ERP**
 - **Companies** – run more than one business entity (e.g. a manufacturing company and an export company).
@@ -72,9 +162,9 @@ Only orders that are *confirmed*, *invoiced* or *paid* count as sales.
 **Roles**
 | Role | Can do |
 |------|--------|
-| `admin`, `manager` | everything, including editing companies, employees, products, warehouses, moving stock and deleting payments |
-| `accountant` | create invoices, record payments, cancel invoices; view everything |
-| `sales` | create customers, orders and shipments; view invoices, payments and stock |
+| `admin`, `manager` | everything, including approving buyers and cost sheets, confirming orders over the credit limit, editing companies, employees, products, warehouses, moving stock and deleting payments |
+| `accountant` | record buyer credit checks, create invoices, record payments, cancel invoices; view everything |
+| `sales` | create enquiries and buyers and submit them for credit check, cost sheets, quotations and orders within the credit limit, create customers, orders and shipments; view invoices, payments and stock |
 
 ## Project structure
 
@@ -85,6 +175,15 @@ backend/
     accounts/       User model (with role), login API, permissions
     companies/      Company model + seed_demo command
     employees/      Department, Employee
+    finance/        Export invoices, receipts with exchange gain/loss, receivables ageing, order profit (services.py)
+    exports/        Packing lists, export shipments, export documents, invoice & packing-list PDFs
+    quality/        Defect library, inline QC (DHU), AQL final inspection (aql.py), corrective actions, summary
+    production/     Sewing lines, work orders, cutting / sewing / finishing output, daily report (services.py)
+    stores/         Raw materials: goods receipts, inspection, material stock ledger, allocation (services.py)
+    procurement/    Suppliers, material requirements, RFQs with quote comparison, supplier POs (services.py)
+    development/    Tech packs (measurements, BOM, revisions), samples, measurement check (services.py)
+    merchandising/  Cost sheets, quotations, order confirmations, credit-limit check (services.py)
+    buyers/         Buyer onboarding: enquiry, buyer, contacts, requirements, credit checks, approval (services.py)
     sales/          Customer, Product, SalesOrder, SalesOrderItem
     billing/        Invoice, Payment, invoice PDF (pdf.py), Razorpay UPI QR (razorpay.py, upi.py)
     inventory/      Warehouse, StockLevel, StockMovement; services.py is the only code that changes stock
@@ -123,7 +222,7 @@ source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env               # then edit values if needed
 python manage.py migrate
-python manage.py seed_demo         # optional: demo data + login admin / admin12345
+python manage.py seed_demo         # optional: demo data + logins admin, manager, accounts, sales (password = name + 12345)
 python manage.py runserver
 ```
 Django admin panel: http://localhost:8000/admin/

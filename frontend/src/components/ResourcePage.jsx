@@ -11,9 +11,15 @@ import Modal from './Modal'
  *   title, endpoint ('/companies/'), columns [{ key, label, render? }],
  *   fields (form config, see FormField), defaults (new record values),
  *   managerOnly (hide edit buttons for non-managers), readOnly (list only),
- *   renderFormExtra(form) — optional extra UI under the form.
+ *   renderFormExtra(form, { close, reload, set }) — optional extra UI under the form.
+ *   params — extra query params for the list (e.g. a status filter), headerExtra — node next to search,
+ *   onRowClick(row) — replaces the edit modal (e.g. open a detail page),
+ *   onCreated(record) — called after a new record is saved.
  */
-export default function ResourcePage({ title, endpoint, columns, fields, defaults = {}, managerOnly, readOnly, renderFormExtra, subtitle }) {
+export default function ResourcePage({
+  title, endpoint, columns, fields, defaults = {}, managerOnly, readOnly, renderFormExtra, subtitle,
+  params, headerExtra, onRowClick, onCreated,
+}) {
   const { canManage } = useAuth()
   const canEdit = !readOnly && (!managerOnly || canManage)
   const [rows, setRows] = useState([])
@@ -24,11 +30,16 @@ export default function ResourcePage({ title, endpoint, columns, fields, default
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
+  const paramsKey = JSON.stringify(params || {})
   const load = useCallback(() => {
-    api.get(endpoint, { params: { page, search: search || undefined } })
+    api.get(endpoint, { params: { page, search: search || undefined, ...JSON.parse(paramsKey) } })
       .then((res) => { setRows(res.data.results); setCount(res.data.count) })
       .catch((e) => setError(errorMessage(e)))
-  }, [endpoint, page, search])
+  }, [endpoint, page, search, paramsKey])
+
+  // Back to page 1 when a filter changes (adjusting state during render, not in an effect).
+  const [lastParams, setLastParams] = useState(paramsKey)
+  if (lastParams !== paramsKey) { setLastParams(paramsKey); setPage(1) }
 
   useEffect(() => { load() }, [load])
 
@@ -37,8 +48,12 @@ export default function ResourcePage({ title, endpoint, columns, fields, default
     setSaving(true)
     setError('')
     try {
-      if (form.id) await api.put(`${endpoint}${form.id}/`, form)
-      else await api.post(endpoint, form)
+      if (form.id) {
+        await api.put(`${endpoint}${form.id}/`, form)
+      } else {
+        const { data } = await api.post(endpoint, form)
+        onCreated?.(data)
+      }
       setForm(null)
       load()
     } catch (err) {
@@ -69,6 +84,7 @@ export default function ResourcePage({ title, endpoint, columns, fields, default
           {subtitle && <p className="muted">{subtitle}</p>}
         </div>
         <div className="actions">
+          {headerExtra}
           <input className="search" placeholder="Search…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
           {canEdit && <button onClick={() => { setError(''); setForm({ ...defaults }) }}>+ New</button>}
         </div>
@@ -86,7 +102,8 @@ export default function ResourcePage({ title, endpoint, columns, fields, default
               <tr><td colSpan={columns.length} className="muted center">No records yet.</td></tr>
             )}
             {rows.map((row) => (
-              <tr key={row.id} className={canEdit ? 'clickable' : ''} onClick={() => canEdit && (setError(''), setForm({ ...row }))}>
+              <tr key={row.id} className={canEdit || onRowClick ? 'clickable' : ''}
+                onClick={() => (onRowClick ? onRowClick(row) : canEdit && (setError(''), setForm({ ...row })))}>
                 {columns.map((c) => (
                   <td key={c.key} className={c.num ? 'num' : ''}>{c.render ? c.render(row) : row[c.key]}</td>
                 ))}
@@ -113,7 +130,7 @@ export default function ResourcePage({ title, endpoint, columns, fields, default
                   onChange={(name, v) => setForm((prev) => ({ ...prev, [name]: v }))} />
               ))}
             </div>
-            {renderFormExtra?.(form)}
+            {renderFormExtra?.(form, { close: () => setForm(null), reload: load, set: (name, v) => setForm((prev) => ({ ...prev, [name]: v })) })}
             {error && <div className="error">{error}</div>}
             <div className="modal-foot">
               {form.id ? <button type="button" className="danger" onClick={remove}>Delete</button> : <span />}
